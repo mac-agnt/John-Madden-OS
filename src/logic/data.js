@@ -37,9 +37,10 @@ const ICONS = {
 
 /* Ontology stays first and is never removed (PulseLogic enforces this too). */
 const REC_SECTIONS = [
-  {id:"ontology", label:"Ontology", blurb:"How every record connects: entities, predicates and the paths between them."},
-  {id:"files", label:"Files", blurb:"Documents, contracts and certificates — indexed where Helios can read them."},
-  {id:"contacts", label:"Contacts", blurb:"Every person the business deals with, staff and external."}
+  {id:"ontology", label:"Ontology", blurb:"How every record connects: client, project, drawing, revision, amendment, task and approval."},
+  {id:"files", label:"Documents", blurb:"Documents and drawing versions, grouped by project."},
+  {id:"contacts", label:"Clients and contacts", blurb:"Households, contacts and prospects. Opens the same client record as Clients."},
+  {id:"staff", label:"Staff", blurb:"The eight demo staff, their team, timezone and open work."}
 ];
 
 const CONTACTS = [
@@ -457,13 +458,20 @@ const STREAM_DEFS = [
    tint:"var(--accent)", icon:"M2 12h4l2.5-6 3.5 12 3-8 2 2h5"}
 ];
 
+/* John Madden OS: twelve modules. Settings sits at the foot of the rail.
+   Group labels come from MODULES in src/jma/ui.ts. */
 const NAV = [
   {label:"Home", icon:"helios", page:"Home"},
   {label:"Agents", icon:"navAgents", page:"Agents"},
-  {label:"Dashboard", icon:"navDash", page:"Dashboard", dot:true},
+  {label:"Dashboard", icon:"navDash", page:"Dashboard"},
+  {label:"Projects", icon:"projects", page:"Projects"},
+  {label:"Drawings", icon:"drawings", page:"Drawings"},
   {label:"Work", icon:"navWork", page:"Work"},
+  {label:"Clients", icon:"clients", page:"Clients"},
+  {label:"Sales", icon:"sales", page:"Sales"},
+  {label:"Knowledge", icon:"knowledge", page:"Knowledge"},
   {label:"Records", icon:"navRecords", page:"Records"},
-  {label:"Activity", icon:"pulseLine", page:"Activity", dot:true}
+  {label:"Activity", icon:"pulseLine", page:"Activity"}
 ];
 
 /* Inbox items follow the real InboxItem shape: what happened, why it matters, what I can do. */
@@ -693,15 +701,13 @@ const AGENT_DEFS = [
    ]}
 ];
 
+/* John Madden OS executive KPIs. Values are computed from the store in
+   DashboardKpiBand.tsx; only the labels and explanations live here. */
 const KPI_DEFS = {
-  revenue:{label:"Revenue", value:"€412,800", delta:"+6.2%", dir:"up", hint:"30 days", hero:true},
-  cash:{label:"Cash collected", value:"€368,140", delta:"+4.1%", dir:"up", hint:"30 days"},
-  overdue:{label:"Overdue debt", value:"€41,200", delta:"+€8,410", dir:"down", hint:"60 days+"},
-  margin:{label:"Gross margin", value:"31.4%", delta:"−0.6pt", dir:"down", hint:"vs last month"},
-  jobs:{label:"Jobs completed", value:"126", delta:"+4", dir:"up", hint:"30 days"},
-  nps:{label:"Repeat rate", value:"68%", delta:"+3pt", dir:"up", hint:"customers ordering again"},
-  pipeline:{label:"Open pipeline", value:"€212,400", delta:"+11%", dir:"up", hint:"quoted, not won"},
-  utilisation:{label:"Installer hours", value:"84%", delta:"−2pt", dir:"down", hint:"billable share"}
+  live:{label:"Live projects", hint:"Open the project register"},
+  attention:{label:"Needs attention", hint:"Blocked, overdue or deadline risk"},
+  review:{label:"Awaiting client review", hint:"Open client decisions"},
+  overdue:{label:"Overdue internal tasks", hint:"Open overdue tasks"}
 };
 
 const ASPECT_DEFS = [
@@ -917,7 +923,7 @@ const SCHEDULES = [
   {id:"s5", name:"Month-end close", cadence:"Last working day · 17:00", next:"Fri 17:00", owner:"Month-end close", on:true, day:4}
 ];
 
-const WIDGET_DEFS = [["inbox","Action inbox"],["work","My work"],["activity","Activity"],["kpi","Today's numbers"],["visits","Site visits"]];
+const WIDGET_DEFS = [["inbox","Briefing"],["work","My work"],["visits","Coming up"],["activity","Releases and automation work"]];
 const WORK_WIDGETS = [
   {id:"queue", label:"My queue", value:"8", hint:"assigned to you", icon:"work", queue:"mine"},
   {id:"late", label:"Running late", value:"11", hint:"past their due date", icon:"health", queue:"overdue"},
@@ -985,14 +991,14 @@ const FACE_TINTS = [
 
 /* ---- ontology graph: generation, Dijkstra traversal, canvas render ---- */
 const CLUSTERS = [
-  ["Organisations", "#c8f04b", 0.00, 0.62, 46],
-  ["People",        "#6ad0f0", 0.90, 0.70, 52],
-  ["Files",         "#b06cf0", 1.75, 0.66, 58],
-  ["Tasks",         "#f0c04b", 2.55, 0.72, 44],
-  ["Invoices",      "#f0567f", 3.35, 0.60, 38],
-  ["Site visits",   "#5fe0a8", 4.15, 0.70, 40],
-  ["Locations",     "#f0803a", 4.95, 0.64, 30],
-  ["Approvals",     "#5f7cf0", 5.65, 0.72, 34]
+  ["Clients and contacts", "#8fb0d6", 0.00, 0.62, 46],
+  ["Projects",      "#6ad0f0", 0.90, 0.70, 52],
+  ["Drawings and briefs", "#b39ae8", 1.75, 0.66, 58],
+  ["Revisions and amendments", "#f0c04b", 2.55, 0.72, 44],
+  ["Tasks",         "#f0907a", 3.35, 0.60, 38],
+  ["Approvals",     "#5fe0a8", 4.15, 0.70, 40],
+  ["Documents and messages", "#e8b46a", 4.95, 0.64, 30],
+  ["Staff",         "#c9d3df", 5.65, 0.72, 34]
 ];
 
 function mulberry(seed){

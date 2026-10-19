@@ -18,28 +18,61 @@ import AgentStudio from "./overlays/AgentStudio";
 import NewRecordDialog from "./overlays/NewRecordDialog";
 import CommandPalette from "./overlays/CommandPalette";
 import BackgroundGallery from "./overlays/BackgroundGallery";
+import { useDemo, personaLabel } from "../jma/store";
+import DemoBar from "../jma/DemoBar";
+import DetailHost from "../jma/DetailHost";
+import { Toast } from "../jma/kit";
+import DashboardPage from "../jma/pages/DashboardPage";
+import ProjectsPage from "../jma/pages/ProjectsPage";
+import DrawingsPage from "../jma/pages/DrawingsPage";
+import ClientsPage from "../jma/pages/ClientsPage";
+import SalesPage from "../jma/pages/SalesPage";
+import WorkPage from "../jma/pages/WorkPage";
+import AgentsPage from "../jma/pages/AgentsPage";
+import KnowledgePage from "../jma/pages/KnowledgePage";
+import ActivityPage from "../jma/pages/ActivityPage";
+import SettingsPage from "../jma/pages/SettingsPage";
+import RecordsStaff from "../jma/pages/RecordsStaff";
+import Portal from "../jma/pages/Portal";
+import { MODULES } from "../jma/ui";
 
 type Props = { v: any };
 
 export default function AppShell({ v }: Props) {
+  const d = useDemo();
+  const me = d.persona.staffId ? d.staff[d.persona.staffId] : undefined;
+  const meName = me ? me.name : "Ciaran Madden";
+  const meRole = personaLabel(d).split(":")[0];
+  const meInitials = me ? me.initials : "CM";
+  if (d.persona.kind === "client") {
+    return (
+      <div id="jma-theme-root" data-theme={v.theme} className="j-portal-root" style={{ fontFamily: "var(--ui)", minHeight: "100vh", background: "var(--bg)", color: "var(--ink)", display: "flex", flexDirection: "column" }}>
+        <DemoBar />
+        <Portal />
+        <Toast />
+      </div>
+    );
+  }
+  const allowed = MODULES.filter((m) => m.personas.includes(d.persona.kind)).map((m) => m.id as string);
+  const page: string = allowed.includes(v.page) ? v.page : allowed[0];
   return (
     <>
-    <div data-theme={v.theme} style={{"fontFamily":"var(--ui)","position":"relative","display":"flex","height":"100vh","overflow":"hidden","background":"var(--bg)","color":"var(--ink)",...v.rootVars}}>
+    <div id="jma-theme-root" data-theme={v.theme} style={{"fontFamily":"var(--ui)","position":"relative","display":"flex","height":"100vh","overflow":"hidden","background":"var(--bg)","color":"var(--ink)",...v.rootVars}}>
       <div style={{"position":"absolute","width":"1px","height":"1px","overflow":"hidden","opacity":"0","pointerEvents":"none"}}>
         <AgentFace shape={"crown-pebble"} state={"idle"} tint={"#191c1f"} size={"1"} />
       </div>
       <nav data-rail-nav="1" style={css(v.railOuter)}>
         <span style={css(v.railThumbStyle)} />
         <div style={css(cat(v.railRowStyle, "margin-bottom:22px"))}>
-          <button className={cx("ix0", "ix1")} onClick={v.toggleRail} title={v.railLabel} style={{"width":"36px","height":"36px","flex":"none","border":"0","borderRadius":"var(--cta-r,11px)","background":"var(--accent-fill,var(--accent))","color":"var(--on-accent)","boxShadow":"var(--accent-glow,none)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","fontSize":"13px","fontWeight":"600","padding":"0","transition":"transform .2s var(--ease)"}}>
-            {"K"}
+          <button className={cx("ix0", "ix1")} onClick={v.toggleRail} title={v.railLabel} style={{"width":"36px","height":"36px","flex":"none","border":"0","borderRadius":"var(--cta-r,11px)","background":"var(--accent-fill,var(--accent))","color":"var(--on-accent)","boxShadow":"var(--accent-glow,none)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","fontSize":"10.5px","fontWeight":"700","letterSpacing":".02em","padding":"0","transition":"transform .2s var(--ease)"}}>
+            {"JMA"}
           </button>
           <span style={css(v.brandStyle)}>
             <span style={{"display":"block","fontSize":"15px","fontWeight":"600","letterSpacing":"-.3px","color":"var(--ink)"}}>
-              {"Kilbride Group"}
+              {"John Madden OS"}
             </span>
-            <span style={{"display":"block","marginTop":"2px","fontSize":"9px","fontWeight":"500","letterSpacing":".16em","color":"var(--accent)"}}>
-              {"PULSE · OPERATIONS"}
+            <span style={{"display":"block","marginTop":"2px","fontSize":"9px","fontWeight":"500","letterSpacing":".12em","color":"var(--accent)"}}>
+              {"JOHN MADDEN & ASSOCIATES"}
             </span>
           </span>
           {v.railOpen && (
@@ -59,6 +92,7 @@ export default function AppShell({ v }: Props) {
                 <div style={{"width":"20px","height":"1px","background":"var(--track)","margin":"7px 0"}} />
               </>
             )}
+            {item?.isGroup && <div className="j-navgroup" role="presentation">{item?.label}</div>}
             {item?.isItem && (
               <>
                 <button className="ix3" data-rail={item?.railKey} onClick={item?.go} onPointerEnter={item?.enter} onPointerLeave={item?.leave} style={css(item?.style)}>
@@ -96,14 +130,14 @@ export default function AppShell({ v }: Props) {
               </div>
               <div style={{"display":"flex","alignItems":"center","gap":"11px","marginTop":"12px"}}>
                 <div style={{"width":"40px","height":"40px","flex":"none","borderRadius":"999px","background":"var(--accent-soft)","color":"var(--accent)","display":"flex","alignItems":"center","justifyContent":"center","fontSize":"13px","fontWeight":"600"}}>
-                  {"MK"}
+                  {meInitials}
                 </div>
                 <div style={{"minWidth":"0"}}>
                   <div style={{"fontSize":"17px","fontWeight":"600","letterSpacing":"-.3px","color":"var(--ink)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                    {"Martin Kilbride"}
+                    {meName}
                   </div>
                   <div style={{"fontSize":"12.5px","color":"var(--faint)","marginTop":"2px","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                    {"Kilbride Group · Owner"}
+                    {meRole + " · demo preview"}
                   </div>
                 </div>
               </div>
@@ -143,14 +177,14 @@ export default function AppShell({ v }: Props) {
             </button>
             <div style={css(cat(v.railRowStyle, "margin-top:10px;padding:12px 10px;border-top:1px solid var(--border)"))}>
               <div style={{"width":"40px","height":"40px","flex":"none","borderRadius":"12px","background":"var(--surface-2)","border":"1px solid var(--border)","color":"var(--body)","display":"flex","alignItems":"center","justifyContent":"center","fontSize":"12px","fontWeight":"600","cursor":"pointer"}}>
-                {"MK"}
+                {meInitials}
               </div>
               <span style={css(v.brandStyle)}>
                 <span style={{"display":"block","fontSize":"14px","fontWeight":"500","color":"var(--ink)"}}>
-                  {"Martin Kilbride"}
+                  {meName}
                 </span>
                 <span style={{"display":"block","marginTop":"2px","fontSize":"12px","color":"var(--faint)"}}>
-                  {"Kilbride Group · Owner"}
+                  {meRole}
                 </span>
               </span>
             </div>
@@ -175,6 +209,7 @@ export default function AppShell({ v }: Props) {
           </>
         )}
         <div style={{"position":"absolute","left":"0","right":"0","bottom":"0","height":"64px","zIndex":"3","pointerEvents":"none","maskImage":"linear-gradient(0deg,#000 0%,transparent 100%)","WebkitMaskImage":"linear-gradient(0deg,#000 0%,transparent 100%)","background":"linear-gradient(0deg,var(--bg) 0%,rgba(0,0,0,0) 100%)","opacity":".85"}} />
+        <DemoBar />
         <div style={css(v.headerFieldStyle)} />
         <header style={{"position":"relative","zIndex":"4","flex":"none","width":"100%","padding":"18px 28px","boxSizing":"border-box","borderBottom":"1px solid var(--border)"}}>
           <div style={css(v.headerPillStyle)}>
@@ -311,10 +346,10 @@ export default function AppShell({ v }: Props) {
                         <>
                           <div style={{"minWidth":"0"}}>
                             <div style={{"fontSize":"12px","fontWeight":"500","lineHeight":"1.2","whiteSpace":"nowrap"}}>
-                              {"Martin Kilbride"}
+                              {meName}
                             </div>
                             <div style={{"fontSize":"10.5px","color":"var(--faint)","lineHeight":"1.2"}}>
-                              {"Owner"}
+                              {meRole}
                             </div>
                           </div>
                         </>
@@ -376,25 +411,36 @@ export default function AppShell({ v }: Props) {
                 </div>
                 <div style={{"position":"relative","display":"flex","alignItems":"center","gap":"9px","padding":"11px 6px 4px","animation":"notifRow .44s cubic-bezier(.16,1,.3,1) 420ms both"}}>
                   <span style={{"flex":"1","minWidth":"0","fontFamily":"var(--mono)","fontSize":"9px","letterSpacing":"0.1em","color":"var(--faint)","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap"}}>
-                    {"EVERY EVENT IS WRITTEN TO THE AUDIT LOG"}
+                    {"DEMO HISTORY · STORED IN THIS BROWSER ONLY"}
                   </span>
                   <button className="ixa" onClick={v.closeNotifs} style={{"flex":"none","height":"28px","padding":"0 13px","border":"1px solid var(--border)","borderRadius":"var(--r-ctl,10px)","background":"var(--surface-2)","color":"var(--body)","fontSize":"12px","cursor":"pointer","transition":"border-color .2s var(--ease),color .2s var(--ease)"}}>
-                    {"Mark all read"}
+                    {"Close"}
                   </button>
                 </div>
               </div>
             </div>
           </>
         )}
-        {v.isDashboard && <DashboardKpiBand v={v} />}
+        {page === "Dashboard" && v.isDashboard && <DashboardKpiBand v={v} />}
         <div data-scroll-main="1" style={{"flex":"1","minHeight":"0","overflowY":"auto","overflowX":"hidden","scrollbarWidth":"none"}}>
-          {v.isChat && <Home v={v} />}
+          {page === "Home" && v.isChat && <Home v={v} />}
+          {page === "Dashboard" && <DashboardPage />}
+          {page === "Projects" && <ProjectsPage />}
+          {page === "Drawings" && <DrawingsPage />}
+          {page === "Clients" && <ClientsPage />}
+          {page === "Sales" && <SalesPage />}
+          {page === "Work" && <WorkPage />}
+          {page === "Agents" && <AgentsPage />}
+          {page === "Knowledge" && <KnowledgePage />}
+          {page === "Activity" && <ActivityPage />}
+          {page === "Settings" && <SettingsPage />}
+          {v.rec?.isStaff && <RecordsStaff />}
           {v.isWork && <Work v={v} />}
           {v.isRecords && <Records v={v} />}
           {v.rec?.isContacts && (
             <>
               <div style={{"display":"flex","flexDirection":"column","gap":"14px"}}>
-                <div style={{"background":"var(--records-card)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px)","boxShadow":"0 24px 60px rgba(0,0,0,.34)","overflow":"hidden"}}>
+                <div className="j-rec-contacts" style={{"background":"var(--records-card)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px)","boxShadow":"0 24px 60px rgba(0,0,0,.34)","overflow":"hidden"}}>
                   <div style={{"display":"flex","alignItems":"flex-start","gap":"14px","padding":"20px 24px 18px"}}>
                     <div style={{"flex":"1","minWidth":"0"}}>
                       <div style={{"fontSize":"15px","fontWeight":"600","letterSpacing":"-.2px"}}>
@@ -576,7 +622,6 @@ export default function AppShell({ v }: Props) {
             </>
           )}
           {v.isSettings && <Settings v={v} />}
-          {v.isDashboard && <Dashboard v={v} />}
           {v.isAgents && <Agents v={v} />}
         </div>
       </main>
@@ -820,6 +865,8 @@ export default function AppShell({ v }: Props) {
       {v.newRec?.open && <NewRecordDialog v={v} />}
       {v.paletteOpen && <CommandPalette v={v} />}
       {v.bgGallery?.open && <BackgroundGallery v={v} />}
+      <DetailHost />
+      <Toast />
     </div>
     </>
   );

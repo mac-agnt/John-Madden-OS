@@ -1,0 +1,101 @@
+/* Sales, Clients and Knowledge module styles. Pulse theme tokens only. */
+
+.jx-stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}
+
+/* Pipeline board: scrolls inside its own region on wide screens, one column on phones */
+.jx-boardwrap{overflow-x:auto;padding-bottom:4px}
+.jx-board{display:grid;gap:12px;grid-template-columns:repeat(6,minmax(210px,1fr));min-width:0}
+.jx-col{display:flex;flex-direction:column;gap:8px;padding:12px;background:var(--surface-faint);border:1px solid var(--border);border-radius:var(--r-md,14px);min-width:0}
+.jx-col-head{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.jx-col-count{font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.jx-card-top{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}
+.jx-card-name{font-size:13.5px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.jx-meta{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11.5px;color:var(--dim)}
+.jx-fold{font-size:12.5px;color:var(--body)}
+.jx-fold summary{cursor:pointer;min-height:32px;display:flex;align-items:center;gap:6px;color:var(--dim)}
+.jx-fold summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.jx-fold-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.jx-fold-item{padding:8px 10px;border-radius:var(--r-sm,10px);border:1px dashed var(--border-strong);display:flex;flex-direction:column;gap:3px}
+
+/* Two-column forms, single column on phones */
+.jx-form{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.jx-form .jx-span{grid-column:1/-1}
+.jx-formfoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* Timeline in the lead record */
+.jx-tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.jx-tl-item{position:relative;display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;padding-bottom:16px}
+.jx-tl-item:not(:last-child)::before{content:"";position:absolute;left:13px;top:28px;bottom:2px;width:2px;background:var(--border)}
+.jx-tl-dot{width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);border:1px solid var(--border);color:var(--dim)}
+.jx-tl-dot.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.jx-tl-dot.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.jx-tl-dot.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.jx-tl-title{font-size:13px;font-weight:600;color:var(--ink);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.jx-tl-body{margin-top:3px;font-size:12.5px;color:var(--body);line-height:1.5}
+
+.jx-dlog{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}
+.jx-dlog li{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+/* Ordered next steps in the lead record */
+.jx-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.jx-step{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm,10px);background:var(--surface-2)}
+.jx-step-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.jx-step-n{flex:none;width:22px;height:22px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:var(--track);color:var(--dim)}
+.jx-step.done .jx-step-n{background:var(--ok-soft);color:var(--ok)}
+.jx-step.next{border-color:var(--accent)}
+.jx-step-title{flex:1 1 160px;font-size:13px;font-weight:600;color:var(--ink)}
+.jx-step.wait .jx-step-title{color:var(--dim);font-weight:500}
+
+/* Messages */
+.jx-group{display:flex;flex-direction:column;gap:10px}
+.jx-group+.jx-group{margin-top:18px}
+.jx-msg{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md,14px);background:var(--surface-2);min-width:0}
+.jx-msg.in{border-left-width:1px}
+.jx-msg.failed{border-color:var(--bad)}
+.jx-msg-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.jx-msg-subject{font-size:13px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.jx-msg-body{font-size:13px;color:var(--body);line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.jx-msg .j-note.internal{margin:0}
+.jx-internal-label{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--ink)}
+
+/* Queue items (waiting on clients, follow-ups) */
+.jx-queue{display:flex;flex-direction:column;gap:10px}
+.jx-qitem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:14px;border:1px solid var(--border);border-radius:var(--r-md,14px);background:var(--surface-2);min-width:0}
+.jx-qitem.blocking{border-color:var(--warn)}
+.jx-qfacts{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px;font-size:12px;color:var(--dim)}
+.jx-qfacts b{font-weight:600;color:var(--body)}
+.jx-qactions{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;justify-content:flex-end}
+
+/* Portal preview cards */
+.jx-cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))}
+.jx-pcard{display:flex;flex-direction:column;gap:8px;padding:14px;border:1px solid var(--border);border-radius:var(--r-md,14px);background:var(--surface-2);min-width:0}
+.jx-pcard.hl{border-color:var(--accent)}
+
+/* Knowledge */
+.jx-article{display:flex;flex-direction:column;gap:6px}
+.jx-checks{display:grid;gap:4px 14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr))}
+.jx-checks .j-check{min-height:32px;align-items:center}
+.jx-video{display:block;width:100%;max-width:880px;aspect-ratio:16/9;border-radius:var(--r-md,14px);background:var(--surface-faint);border:1px solid var(--border)}
+.jx-transcript{font-size:13px;line-height:1.6;color:var(--body);max-width:72ch;white-space:pre-wrap}
+.jx-preview{padding:16px;border-radius:var(--r-md,14px);border:1px solid var(--border-strong);background:var(--surface)}
+.jx-preview h3{margin:0 0 8px;font-size:16px;font-weight:600;color:var(--ink)}
+.jx-preview p{margin:0;font-size:13.5px;line-height:1.6;color:var(--body);white-space:pre-wrap}
+
+.jx-banner{display:flex;gap:10px;align-items:flex-start}
+.jx-banner .j-note{flex:1}
+
+@media (max-width:1180px){ .jx-board{grid-template-columns:repeat(6,minmax(200px,1fr))} }
+@media (max-width:760px){
+  .jx-board{grid-template-columns:minmax(0,1fr)}
+  .jx-boardwrap{overflow-x:visible}
+  .jx-form{grid-template-columns:minmax(0,1fr)}
+  .jx-qitem{grid-template-columns:minmax(0,1fr)}
+  .jx-qactions{justify-content:flex-start}
+  .jx-checks .j-check{min-height:44px}
+  .jx-fold summary{min-height:44px}
+  .jx-col .j-card{min-height:44px}
+  .jx-scope .j-select,.jx-scope .j-input{min-height:44px}
+  .jx-scope .j-btn-sm,.jx-scope .j-seg-btn{min-height:44px}
+  .jx-scope .j-btn-sm.j-btn-icon{width:44px}
+  .jx-scope .j-check{min-height:44px;align-items:center}
+}

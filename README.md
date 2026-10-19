@@ -1,14 +1,13 @@
-# Pulse — Harbour
+# John Madden OS (demo)
 
-React build of the **Pulse v5 Harbour** design from Claude Design, the operations dashboard mocked up for Kilbride Group.
-
-Every page, theme and interaction from the design is here. Screens were checked against the original mockup and match pixel for pixel at 1440×900 and 1024×720.
+A clickable, frontend-only demonstration of John Madden & Associates' residential project operation, built on the Pulse v5 Harbour template. All operating data is fictional; integrations are simulated. See `docs/PRD.md` for the draft PRD, the presentation route and the assumptions that need Ciaran's confirmation.
 
 ## Run it
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
+npm run typecheck
 npm run build      # type-check + production build into dist/
 ```
 
@@ -16,42 +15,14 @@ npm run build      # type-check + production build into dist/
 
 | Area | Where |
 | --- | --- |
-| Pages: Home (Helios chat), Agents, Dashboard, Work, Records, Activity, Settings | `src/views/pages/` |
-| Overlays: ⌘K palette, agent studio, Helios mini chat, work viewer, new record, background gallery | `src/views/overlays/` |
-| App frame: sidebar, top bar, notifications | `src/views/AppShell.tsx` |
-| State and behaviour | `src/logic/PulseLogic.js` |
-| Demo data (Kilbride Group) | `src/logic/data.js` |
-| Agent avatar | `src/components/AgentFace.tsx` |
-| Theme tokens (Harbour, light and 11 more), animations | `src/styles/pulse.css` |
+| Demo model, fixtures, domain actions, selectors | `src/jma/` (`types.ts`, `seed.ts`, `store.ts`, `selectors.ts`) |
+| Module pages and record drawers | `src/jma/pages/` |
+| Guided Dunne story | `src/jma/story.ts` (demo strip → Run client story) |
+| Shared UI kit on the Pulse tokens | `src/jma/kit.tsx`, `src/styles/jma.css` |
+| Pulse shell, Home chat, Records and ontology | `src/views/`, `src/logic/PulseLogic.js`, `src/logic/data.js` |
+| Sample drawings, documents, video guide | `public/demo/` |
+| Theme tokens (`jma` dark, slate light) | `src/styles/pulse.css` |
 
-## How it fits together
+State lives in one store and persists to this browser's localStorage. "Reset demo" restores the 19 October 2026 09:00 baseline.
 
-- **`PulseLogic`** holds all state. Its `renderVals()` returns one flat object `v`.
-- **Views** are plain React components that render from `v`.
-- **`LogicHost`** (`src/runtime/logic.tsx`) mounts the logic and re-renders on `setState`.
-- **Backgrounds** live in `src/App.tsx`:
-  - `dashboardBackdrop`: the colour of the Dashboard KPI background
-  - `kpiBackdropOn`: whether that background shows
-  - `recordsBackdrop`: the colour of the Records wash (`""` uses the theme gradient)
-- **Customising for a client:** read `CLAUDE.md` first. It lists the layout rules every copy keeps.
-
-## Updating from Claude Design
-
-Export the new version, replace the file in `design/`, then run:
-
-```bash
-npm run import-design
-```
-
-This regenerates:
-
-- `src/views/`
-- `src/styles/pulse.css`
-- `src/styles/interactions.css`
-- `src/logic/`
-
-`AgentFace` is hand-written and left alone. Commit before running, because it overwrites hand edits to those files.
-
-## Fixed from the mockup
-
-In the mockup, the work viewer's wrapper `<div>` was never closed. As a result, the ⌘K palette, agent studio, new record dialog and background gallery could only appear while the work viewer was open. They now open on their own. The fix is applied in `tools/import-design.mjs`.
+Customising rules for the template are in `CLAUDE.md`. Don't run `npm run import-design` on this copy: it overwrites the customised views and logic.

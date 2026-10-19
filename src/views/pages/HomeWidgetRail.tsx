@@ -1,9 +1,44 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { arr, cat, css, txt } from "../../runtime/template";
+import { useDemo } from "../../jma/store";
+import * as S from "../../jma/selectors";
+import { go, openDetail } from "../../jma/ui";
+import { briefingLines } from "../../jma/agents";
+import { dueLabel, fmtDateTime, fmtShortDate, fmtTime, ago, TZ_PH } from "../../jma/time";
 
 type Props = { v: any };
 
+/* Briefings, my work, what is coming up and recent work done by simulated
+   automations. All of it is read from the store; the Home centre stays clean. */
+function RailCard({ title, count, onRemove, edit, children, action }: { title: string; count?: ReactNode; onRemove?: () => void; edit?: boolean; children: ReactNode; action?: ReactNode }) {
+  return (
+    <section aria-label={title} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--card-r,18px)", boxShadow: "var(--card-shadow)", padding: "16px 18px 10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <h2 style={{ flex: 1, margin: 0, fontSize: "13.5px", fontWeight: 600 }}>{title}</h2>
+        {count != null && <span style={{ height: 24, display: "flex", alignItems: "center", padding: "0 10px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: "var(--r-sm,9px)", fontSize: 11, color: "var(--dim)" }}>{count}</span>}
+        {action}
+        {edit && onRemove && <button type="button" className="ixd" onClick={onRemove} aria-label={"Remove " + title} style={{ width: 24, height: 24, border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface-2)", color: "var(--dim)", cursor: "pointer" }}>×</button>}
+      </div>
+      <div style={{ marginTop: 8 }}>{children}</div>
+    </section>
+  );
+}
+
+const rowBtn: React.CSSProperties = { all: "unset", boxSizing: "border-box", display: "flex", gap: 10, alignItems: "flex-start", width: "100%", padding: "9px 0", borderTop: "1px solid var(--border)", cursor: "pointer", fontSize: "12.5px", lineHeight: 1.45, color: "var(--body)" };
+const dot = (c: string) => <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 7, background: c, flex: "none", marginTop: 6 }} />;
+
 export default function HomeWidgetRail({ v }: Props) {
+  const d = useDemo();
+  const att = S.attention(d);
+  const me = d.persona.staffId || "s-ciaran";
+  const mine = S.openTasks(d).filter((t) => d.persona.kind === "admin" ? S.isOverdue(d, t) || t.due < d.now + 2 * 86400000 : t.assigneeId === me).sort((a, b) => a.due - b.due).slice(0, 6);
+  const soon = d.now + 8 * 86400000;
+  const coming = [
+    ...Object.values(d.visits).filter((x) => x.state === "Scheduled" && x.at >= d.now && x.at < soon).map((x) => ({ at: x.at, text: "Site visit · " + S.household(d, x.projectId) + " (" + S.staffName(d, x.ownerId) + ")", go: () => openDetail({ kind: "project", id: x.projectId }) })),
+    ...Object.values(d.programme).filter((x) => x.fixed && x.fixedStart! >= d.now && x.fixedStart! < soon).map((x) => ({ at: x.fixedStart!, text: x.label + " · " + S.household(d, x.projectId), go: () => go("Projects", "programme") })),
+    ...Object.values(d.council).filter((x) => x.state === "Response in preparation").map((x) => ({ at: x.internalTarget, text: "Internal response target · " + S.household(d, x.projectId) + " (sample)", go: () => openDetail({ kind: "project", id: x.projectId }) })),
+  ].sort((a, b) => a.at - b.at).slice(0, 5);
+  const recent = S.visibleEvents(d).filter((e) => e.type === "drawing.released" || e.actor.kind === "agent" || e.actor.kind === "system" || e.status === "failed").slice(-6).reverse();
   return (
     <>
       <aside style={{"position":"relative","zIndex":"1","width":"352px","flex":"none","minHeight":"0","overflowY":"auto","display":"flex","flexDirection":"column","gap":"14px","padding":"2px 0 6px 20px"}}>
@@ -92,215 +127,55 @@ export default function HomeWidgetRail({ v }: Props) {
           </>
         )}
         {v.show?.inbox && (
-          <>
-            <div style={{"background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px) saturate(1.3)","boxShadow":"var(--card-shadow)","transition":"transform .28s var(--ease),border-color .24s var(--ease),box-shadow .28s var(--ease)","padding":"20px 22px 10px"}}>
-              <div style={{"display":"flex","alignItems":"center","gap":"10px"}}>
-                <div style={{"flex":"1","fontSize":"13.5px","fontWeight":"500"}}>
-                  {"Action inbox"}
-                </div>
-                <span style={{"height":"24px","display":"flex","alignItems":"center","padding":"0 10px","background":"var(--surface-2)","border":"1px solid var(--border)","borderRadius":"var(--r-sm,9px)","fontFamily":"var(--mono)","fontSize":"11px","color":"var(--dim)"}}>
-                  {txt(v.inboxCount)}
-                </span>
-                {v.widgetEdit && (
-                  <>
-                    <button className="ixd" onClick={v.removeInbox} title="Remove widget" style={{"width":"24px","height":"24px","flex":"none","border":"1px solid var(--border)","borderRadius":"8px","background":"var(--surface-2)","color":"var(--dim)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"color .2s var(--ease),border-color .2s var(--ease)"}}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                        <path d="M6 6l12 12 M18 6 6 18" />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-              <div style={{"marginTop":"8px"}}>
-                {arr(v.inboxTop).map((i: any, i18: number) => (
-                  <Fragment key={i18}>
-                    <div onClick={i?.open} style={{"display":"flex","gap":"12px","padding":"12px 0","borderTop":"1px solid var(--border)","cursor":"pointer","transition":"background .2s var(--ease),padding-left .24s var(--ease)"}}>
-                      <span style={css(cat("width:7px;height:7px;border-radius:2px;flex:none;margin-top:5px;background:", i?.dot))} />
-                      <div style={{"flex":"1","minWidth":"0"}}>
-                        <div style={{"fontSize":"13px","lineHeight":"1.4"}}>
-                          {txt(i?.title)}
-                        </div>
-                        <div style={{"fontSize":"11.5px","color":"var(--dim)","marginTop":"3px","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap"}}>
-                          {txt(i?.why)}
-                        </div>
-                      </div>
-                      <span style={{"flex":"none","fontFamily":"var(--mono)","fontSize":"10.5px","color":"var(--faint)"}}>
-                        {txt(i?.age)}
-                      </span>
-                    </div>
-                  </Fragment>
-                ))}
-                {v.inboxEmpty && (
-                  <>
-                    <div style={{"padding":"20px 0 24px","borderTop":"1px solid var(--border)","textAlign":"center","fontSize":"12.5px","color":"var(--dim)"}}>
-                      {"Nothing needs you."}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </>
+          <RailCard title="Briefing" count={att.length + " need attention"} edit={v.widgetEdit} onRemove={v.removeInbox} action={<button type="button" className="j-btn j-btn-ghost j-btn-sm" onClick={() => go("Agents", "briefing")}>Open</button>}>
+            {briefingLines(d).slice(0, 5).map((l, i) => (
+              <button key={i} type="button" style={rowBtn} onClick={() => l.go && go(l.go[0] as never, l.go[1], l.go[2] ? { kind: "project", id: l.go[2] } : undefined)}>
+                <span style={{ flex: "none", width: 78, fontSize: 10.5, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--faint)", paddingTop: 1 }}>{l.k}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>{l.v}</span>
+              </button>
+            ))}
+          </RailCard>
         )}
         {v.show?.work && (
-          <>
-            <div style={{"background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px) saturate(1.3)","boxShadow":"var(--card-shadow)","transition":"transform .28s var(--ease),border-color .24s var(--ease),box-shadow .28s var(--ease)","padding":"20px 22px 12px"}}>
-              <div style={{"display":"flex","alignItems":"center","gap":"10px"}}>
-                <div style={{"flex":"1","fontSize":"13.5px","fontWeight":"500"}}>
-                  {"My work"}
-                </div>
-                <span style={{"fontFamily":"var(--mono)","fontSize":"10.5px","color":"var(--faint)"}}>
-                  {txt(v.taskSummary)}
-                </span>
-                {v.widgetEdit && (
-                  <>
-                    <button className="ixd" onClick={v.removeWork} title="Remove widget" style={{"width":"24px","height":"24px","flex":"none","border":"1px solid var(--border)","borderRadius":"8px","background":"var(--surface-2)","color":"var(--dim)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"color .2s var(--ease),border-color .2s var(--ease)"}}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                        <path d="M6 6l12 12 M18 6 6 18" />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-              <div style={{"marginTop":"8px"}}>
-                {arr(v.tasks).map((t: any, i19: number) => (
-                  <Fragment key={i19}>
-                    <div style={{"display":"flex","alignItems":"center","gap":"11px","padding":"10px 0","borderTop":"1px solid var(--border)"}}>
-                      <button onClick={t?.toggle} style={css(cat("width:17px;height:17px;flex:none;border-radius:6px;border:1.5px solid ", t?.ring, ";background:", t?.fill, ";color:var(--on-accent);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0"))}>
-                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" style={css(cat("opacity:", t?.checkOpacity, ";transition:opacity .18s var(--ease)"))}>
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                      </button>
-                      <span style={css(cat("flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:", t?.color, ";text-decoration:", t?.strike))}>
-                        {txt(t?.title)}
-                      </span>
-                      <span style={css(cat("font-family:var(--mono);font-size:10.5px;color:", t?.dueColor))}>
-                        {txt(t?.due)}
-                      </span>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-        {v.show?.kpi && (
-          <>
-            <div style={{"background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px) saturate(1.3)","boxShadow":"var(--card-shadow)","transition":"transform .28s var(--ease),border-color .24s var(--ease),box-shadow .28s var(--ease)","padding":"20px 22px 22px"}}>
-              <div style={{"display":"flex","alignItems":"center","gap":"10px"}}>
-                <div style={{"flex":"1","fontSize":"13.5px","fontWeight":"500"}}>
-                  {"Today's numbers"}
-                </div>
-                {v.widgetEdit && (
-                  <>
-                    <button className="ixd" onClick={v.removeKpi} title="Remove widget" style={{"width":"24px","height":"24px","flex":"none","border":"1px solid var(--border)","borderRadius":"8px","background":"var(--surface-2)","color":"var(--dim)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"color .2s var(--ease),border-color .2s var(--ease)"}}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                        <path d="M6 6l12 12 M18 6 6 18" />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-              <div style={{"display":"grid","gridTemplateColumns":"1fr 1fr","gap":"10px","marginTop":"14px"}}>
-                {arr(v.miniKpis).map((k: any, i20: number) => (
-                  <Fragment key={i20}>
-                    <div style={{"padding":"13px 14px","background":"var(--surface-2)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)"}}>
-                      <div style={{"fontSize":"11.5px","color":"var(--dim)"}}>
-                        {txt(k?.label)}
-                      </div>
-                      <div style={{"fontSize":"19px","fontWeight":"500","letterSpacing":"-.6px","marginTop":"6px"}}>
-                        {txt(k?.value)}
-                      </div>
-                      <div style={css(cat("font-size:11px;color:", k?.deltaColor, ";margin-top:4px"))}>
-                        {txt(k?.delta)}
-                      </div>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-          </>
+          <RailCard title={d.persona.kind === "admin" ? "Due soon across the practice" : "My work"} count={mine.length} edit={v.widgetEdit} onRemove={v.removeWork}>
+            {mine.length === 0 && <div className="j-small" style={{ padding: "8px 0" }}>Nothing due in the next two days.</div>}
+            {mine.map((t) => {
+              const late = S.isOverdue(d, t);
+              return (
+                <button key={t.id} type="button" style={rowBtn} onClick={() => openDetail({ kind: "task", id: t.id })}>
+                  {dot(late ? "var(--bad)" : "var(--accent)")}
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", color: "var(--ink)" }}>{t.title}</span>
+                    <span style={{ display: "block", fontSize: 11.5, color: late ? "var(--bad)" : "var(--dim)" }}>{(late ? "Overdue · " : "") + S.staffName(d, t.assigneeId) + " · " + dueLabel(t.due, d.now, d.staff[t.assigneeId]?.tz)}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </RailCard>
         )}
         {v.show?.visits && (
-          <>
-            <div style={{"background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px) saturate(1.3)","boxShadow":"var(--card-shadow)","transition":"transform .28s var(--ease),border-color .24s var(--ease),box-shadow .28s var(--ease)","padding":"20px 22px 10px"}}>
-              <div style={{"display":"flex","alignItems":"center","gap":"10px"}}>
-                <div style={{"flex":"1","fontSize":"13.5px","fontWeight":"500"}}>
-                  {"Site visits this week"}
-                </div>
-                {v.widgetEdit && (
-                  <>
-                    <button className="ixd" onClick={v.removeVisits} title="Remove widget" style={{"width":"24px","height":"24px","flex":"none","border":"1px solid var(--border)","borderRadius":"8px","background":"var(--surface-2)","color":"var(--dim)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"color .2s var(--ease),border-color .2s var(--ease)"}}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                        <path d="M6 6l12 12 M18 6 6 18" />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-              <div style={{"marginTop":"6px"}}>
-                {arr(v.visitWidget).map((v: any, i21: number) => (
-                  <Fragment key={i21}>
-                    <div style={{"display":"flex","alignItems":"center","gap":"11px","padding":"11px 0","borderTop":"1px solid var(--border)"}}>
-                      <span style={css(cat("width:7px;height:7px;border-radius:2px;flex:none;background:", v?.dot))} />
-                      <span style={{"flex":"1","minWidth":"0","fontSize":"12.5px","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap"}}>
-                        {txt(v?.title)}
-                      </span>
-                      <span style={{"fontFamily":"var(--mono)","fontSize":"10.5px","color":"var(--faint)"}}>
-                        {txt(v?.when)}
-                      </span>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-          </>
+          <RailCard title="Coming up" count={coming.length} edit={v.widgetEdit} onRemove={v.removeVisits}>
+            {coming.length === 0 && <div className="j-small" style={{ padding: "8px 0" }}>No visits, meetings or recorded dates in the next week.</div>}
+            {coming.map((c, i) => (
+              <button key={i} type="button" style={rowBtn} onClick={c.go}>
+                <span style={{ flex: "none", width: 78, fontSize: 11.5, color: "var(--dim)" }}>{fmtShortDate(c.at)}<br />{fmtTime(c.at)}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>{c.text}</span>
+              </button>
+            ))}
+          </RailCard>
         )}
         {v.show?.activity && (
-          <>
-            <div style={{"background":"var(--surface-strong)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px) saturate(1.3)","boxShadow":"var(--card-shadow)","transition":"transform .28s var(--ease),border-color .24s var(--ease),box-shadow .28s var(--ease)","padding":"20px 22px 10px"}}>
-              <div style={{"display":"flex","alignItems":"center","gap":"9px"}}>
-                <div style={{"flex":"1","fontSize":"13.5px","fontWeight":"500"}}>
-                  {"Activity"}
-                </div>
-                <span style={{"width":"6px","height":"6px","borderRadius":"2px","background":"var(--accent)"}} />
-                <span style={{"fontSize":"11.5px","color":"var(--dim)"}}>
-                  {"Events"}
+          <RailCard title="Releases and automation work" edit={v.widgetEdit} onRemove={v.removeActivity} action={<button type="button" className="j-btn j-btn-ghost j-btn-sm" onClick={() => go("Activity", "all")}>All</button>}>
+            {recent.map((e) => (
+              <button key={e.id} type="button" style={rowBtn} onClick={() => openDetail({ kind: "event", id: e.id })}>
+                {dot(e.status === "failed" ? "var(--bad)" : e.status === "attention" ? "var(--warn)" : "var(--accent)")}
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block" }}><span style={{ color: "var(--ink)" }}>{e.actor.name}</span> · {e.summary}</span>
+                  <span style={{ display: "block", fontSize: 11, color: "var(--faint)" }}>{(e.status === "failed" ? "Failed · " : "") + ago(e.at, d.now) + " · " + fmtDateTime(e.at)}</span>
                 </span>
-                {v.widgetEdit && (
-                  <>
-                    <button className="ixd" onClick={v.removeActivity} title="Remove widget" style={{"width":"24px","height":"24px","flex":"none","border":"1px solid var(--border)","borderRadius":"8px","background":"var(--surface-2)","color":"var(--dim)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"color .2s var(--ease),border-color .2s var(--ease)"}}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                        <path d="M6 6l12 12 M18 6 6 18" />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-              <div style={{"marginTop":"14px"}}>
-                {arr(v.activity).map((a: any, i22: number) => (
-                  <Fragment key={i22}>
-                    <div style={{"display":"flex","gap":"11px","paddingBottom":"14px"}}>
-                      <span style={css(cat("width:6px;height:6px;border-radius:2px;flex:none;margin-top:6px;background:", a?.dot))} />
-                      <div style={{"minWidth":"0","flex":"1"}}>
-                        <div style={{"fontSize":"12.5px","lineHeight":"1.5","color":"var(--body)"}}>
-                          <span style={{"color":"var(--ink)"}}>
-                            {txt(a?.who)}
-                          </span>
-                          {" "}
-                          {txt(a?.what)}
-                        </div>
-                        <div style={{"fontFamily":"var(--mono)","fontSize":"10px","color":"var(--faint)","marginTop":"3px"}}>
-                          {txt(a?.event)}
-                          {" · "}
-                          {txt(a?.when)}
-                        </div>
-                      </div>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-          </>
+              </button>
+            ))}
+          </RailCard>
         )}
       </aside>
     </>

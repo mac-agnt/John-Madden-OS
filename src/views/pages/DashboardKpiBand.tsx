@@ -1,93 +1,48 @@
-import { Fragment } from "react";
-import { arr, cat, css, txt } from "../../runtime/template";
+import { css, cat } from "../../runtime/template";
 import KpiBackdrop from "./KpiBackdrop";
+import { useDemo } from "../../jma/store";
+import * as S from "../../jma/selectors";
+import { go, setFilter } from "../../jma/ui";
+import { KPI_DEFS } from "../../logic/data";
 
 type Props = { v: any };
 
+/* The four executive KPIs. Values are computed from the store on every render
+   and each card opens the records behind it. Labels live in KPI_DEFS (data.js). */
 export default function DashboardKpiBand({ v }: Props) {
+  const d = useDemo();
+  const c = S.counts(d);
+  const att = S.attention(d);
+  const ph = c.phOverdue;
+  const cards = [
+    { key: "live", value: c.live, hint: S.stageCounts(d).filter((x) => x.count).length + " stages in use", open: () => { setFilter("projects.attention", "all"); go("Projects", "all"); } },
+    { key: "attention", value: c.attention, hint: att.map((a) => S.household(d, a.project.id)).join(", ") || "Nothing flagged", tone: c.attention ? "var(--warn)" : undefined, open: () => { setFilter("projects.attention", "attention"); go("Projects", "all"); } },
+    { key: "review", value: c.awaitingReview, hint: "Released, no decision or change yet", open: () => go("Work", "approvals") },
+    { key: "overdue", value: c.overdue, hint: ph + " Philippines · " + (c.overdue - ph) + " Mullingar", tone: c.overdue ? "var(--bad)" : undefined, open: () => { setFilter("work.due", "overdue"); go("Work", "tasks"); } },
+  ];
   return (
-    <>
-      <div data-kpi-band="1" style={css(cat("position:relative;z-index:3;flex:none;width:100%;max-width:1280px;margin:0 auto;padding:40px 50px 34px;box-sizing:border-box;background:none;--kb:", v.kpiBackdrop))}>
-        {v.kpiBackdropOn && <KpiBackdrop v={v} />}
-        <div style={{"position":"relative","display":"flex","alignItems":"center","gap":"12px","paddingBottom":"12px"}}>
-          <div style={{"flex":"1","minWidth":"0"}}>
-            <div style={{"fontFamily":"var(--mono)","fontSize":"9.5px","letterSpacing":"0.13em","color":"var(--on-accent-2)"}}>
-              {"CORE KPIS · ALWAYS IN VIEW"}
-            </div>
-            <div style={{"fontSize":"30px","fontWeight":"600","letterSpacing":"-.9px","marginTop":"8px","color":"var(--ink)"}}>
-              {txt(v.dashTitle)}
-            </div>
-          </div>
-          <button className="ixb" onClick={v.toggleKpiEdit} style={css(cat("height:32px;display:flex;align-items:center;gap:7px;padding:0 13px;background:", v.kpiEditBg, ";border:1px solid ", v.kpiEditBorder, ";border-radius:var(--r-ctl,9px);font-size:12.5px;color:", v.kpiEditColor, ";cursor:pointer;transition:background .2s var(--ease),border-color .2s var(--ease),transform .18s var(--ease)"))}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 20h4L19 9a2.4 2.4 0 0 0-3.4-3.4L4.6 16.6V20Z" />
-            </svg>
-            {txt(v.kpiEditLabel)}
-          </button>
+    <div data-kpi-band="1" style={css(cat("position:relative;z-index:3;flex:none;width:100%;margin:0 auto;padding:22px 24px 18px;box-sizing:border-box;background:none;--kb:", v.kpiBackdrop))}>
+      {v.kpiBackdropOn && <KpiBackdrop v={v} />}
+      <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 12, paddingBottom: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 280px", minWidth: 0 }}>
+          <div style={{ fontSize: "10.5px", fontWeight: 600, letterSpacing: "0.13em", color: "var(--on-accent-2)" }}>EXECUTIVE · DEMO DATA</div>
+          <div style={{ fontSize: "24px", fontWeight: 600, letterSpacing: "-.6px", marginTop: 6, color: "var(--ink)" }}>{v.dashTitle}</div>
         </div>
-        <div style={{"position":"relative","display":"flex","flexWrap":"wrap","gap":"16px","marginTop":"10px"}}>
-          {arr(v.kpis).map((k: any, i4: number) => (
-            <Fragment key={i4}>
-              <div className="ixc" style={{"position":"relative","flex":"1 1 180px","minWidth":"0","padding":"22px 22px 20px","background":"linear-gradient(160deg,rgba(255,255,255,.075),rgba(255,255,255,.015) 55%)","border":"1px solid rgba(255,255,255,.1)","borderRadius":"24px","color":"var(--ink)","backdropFilter":"blur(22px) saturate(1.5)","WebkitBackdropFilter":"blur(22px) saturate(1.5)","boxShadow":"inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(0,0,0,.2),0 10px 30px rgba(0,0,0,.22)","transition":"transform .3s var(--ease),border-color .25s var(--ease),background .25s var(--ease)"}}>
-                <div style={{"display":"flex","alignItems":"flex-start","gap":"10px"}}>
-                  <div style={{"flex":"1","minWidth":"0","fontSize":"10.5px","fontWeight":"500","letterSpacing":".14em","textTransform":"uppercase","color":"var(--faint)","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap","paddingTop":"4px"}}>
-                    {txt(k?.label)}
-                  </div>
-                </div>
-                <div style={css(k?.valueStyle)}>
-                  {txt(k?.value)}
-                </div>
-                <div style={{"display":"flex","alignItems":"center","gap":"6px","marginTop":"7px"}}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={k?.deltaColor} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={css(k?.arrowStyle)}>
-                    <path d={k?.arrow} />
-                  </svg>
-                  <span style={css(cat("font-size:11.5px;white-space:nowrap;color:", k?.deltaColor))}>
-                    {txt(k?.delta)}
-                  </span>
-                  <span style={{"fontSize":"10.5px","opacity":".78","minWidth":"0","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap"}}>
-                    {txt(k?.hint)}
-                  </span>
-                </div>
-                {v.kpiEdit && (
-                  <>
-                    <button className="ixd" onClick={k?.remove} title="Remove KPI" style={{"position":"absolute","top":"9px","right":"9px","width":"22px","height":"22px","border":"1px solid var(--border)","borderRadius":"8px","background":"var(--surface-2)","color":"var(--dim)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","transition":"color .2s var(--ease),border-color .2s var(--ease)"}}>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-                        <path d="M6 6l12 12 M18 6 6 18" />
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-            </Fragment>
-          ))}
-        </div>
-        {v.kpiEdit && (
-          <>
-            <div style={{"display":"flex","flexWrap":"wrap","alignItems":"center","gap":"7px","marginTop":"10px","animation":"expandIn .26s var(--ease) both"}}>
-              <span style={{"fontFamily":"var(--mono)","fontSize":"9.5px","letterSpacing":"0.12em","color":"var(--faint)","marginRight":"2px"}}>
-                {"ADD KPI"}
-              </span>
-              {arr(v.kpiChoices).map((c: any, i5: number) => (
-                <Fragment key={i5}>
-                  <button className="ixe" onClick={c?.add} style={{"height":"29px","display":"flex","alignItems":"center","gap":"7px","padding":"0 12px","background":"var(--surface-2)","border":"1px solid var(--border)","borderRadius":"var(--r-ctl,9px)","fontSize":"12px","color":"var(--body)","cursor":"pointer","transition":"border-color .2s var(--ease),transform .18s var(--ease)"}}>
-                    <span style={{"color":"var(--accent)"}}>
-                      {"+"}
-                    </span>
-                    {txt(c?.label)}
-                  </button>
-                </Fragment>
-              ))}
-              {v.noKpiChoices && (
-                <>
-                  <span style={{"fontSize":"12px","color":"var(--faint)"}}>
-                    {"Every KPI is pinned."}
-                  </span>
-                </>
-              )}
-            </div>
-          </>
-        )}
       </div>
-    </>
+      <div style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,200px),1fr))", gap: 14, marginTop: 6 }}>
+        {cards.map((k) => {
+          const def = (KPI_DEFS as Record<string, { label: string; hint: string }>)[k.key];
+          return (
+            <button key={k.key} type="button" className="ixc j-kpi" onClick={k.open} aria-label={def.label + ": " + k.value + ". Open the records."}
+              style={{ position: "relative", minWidth: 0, padding: "18px 20px 16px", textAlign: "left", background: "linear-gradient(160deg,rgba(255,255,255,.075),rgba(255,255,255,.015) 55%)", border: "1px solid rgba(255,255,255,.1)", borderRadius: "var(--card-r,20px)", color: "var(--ink)", cursor: "pointer", backdropFilter: "blur(22px) saturate(1.5)", boxShadow: "inset 0 1px 0 rgba(255,255,255,.12),0 10px 30px rgba(0,0,0,.22)", transition: "border-color .2s var(--ease)" }}>
+              <div style={{ fontSize: "10.5px", fontWeight: 600, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--faint)" }}>{def.label}</div>
+              <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-1px", marginTop: 8, lineHeight: 1, fontVariantNumeric: "tabular-nums", color: k.tone || "var(--ink)" }}>{k.value}</div>
+              <div style={{ fontSize: 12, marginTop: 8, color: "var(--dim)", overflowWrap: "anywhere" }}>{k.hint}</div>
+              <div style={{ fontSize: 11, marginTop: 4, color: "var(--faint)" }}>{def.hint}</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }

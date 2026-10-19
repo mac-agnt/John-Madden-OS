@@ -164,7 +164,7 @@ export default function CommandPalette({ v }: Props) {
                 </div>
               </>
             )}
-            {v.hasQuery && (
+            {v.hasQuery && v.canAsk && (
               <>
                 <div onClick={v.askHelios} onMouseEnter={v.hoverAsk} style={css(v.askRowStyle)}>
                   <span style={css(v.askIconStyle)}>
@@ -174,7 +174,7 @@ export default function CommandPalette({ v }: Props) {
                   </span>
                   <div style={{"minWidth":"0","flex":"1"}}>
                     <div style={{"fontSize":"13.5px","lineHeight":"1.35"}}>
-                      {"Ask Helios"}
+                      {"Ask John Madden OS"}
                     </div>
                     <div style={{"fontSize":"11.5px","color":"var(--dim)","marginTop":"2px","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap"}}>
                       {txt(v.askPreview)}
@@ -239,7 +239,7 @@ export default function CommandPalette({ v }: Props) {
                         {"Nothing you can see matches that"}
                       </div>
                       <div style={{"fontSize":"12px","color":"var(--dim)","marginTop":"6px"}}>
-                        {"Results are filtered to your grants. Press ⌘↵ to ask Helios instead."}
+                        {"Results are scoped to the previewed persona. Press ⌘↵ to ask instead."}
                       </div>
                     </div>
                   </>
@@ -255,7 +255,7 @@ export default function CommandPalette({ v }: Props) {
               {"↵ OPEN"}
             </span>
             <span>
-              {"⌘↵ ASK HELIOS"}
+              {"⌘↵ ASK"}
             </span>
             <span style={{"flex":"1"}} />
             <span>

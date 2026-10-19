@@ -17,7 +17,7 @@ export default function HomeThread({ v }: Props) {
             </div>
           </div>
           <div style={{"flex":"none","display":"flex","flexDirection":"column","alignItems":"flex-end","gap":"10px","animation":"popIn .34s var(--ease) both"}}>
-            <div style={{"display":"flex","flexWrap":"nowrap","alignItems":"center","gap":"8px","fontFamily":"var(--mono)"}}>
+            <div className="j-thread-flip" style={{"display":"flex","flexWrap":"nowrap","alignItems":"center","gap":"8px","fontFamily":"var(--mono)"}}>
               {arr(v.flipUnits).map((u: any, i6: number) => (
                 <Fragment key={i6}>
                   <div style={{"display":"flex","flexWrap":"nowrap","alignItems":"center","gap":"3px"}}>

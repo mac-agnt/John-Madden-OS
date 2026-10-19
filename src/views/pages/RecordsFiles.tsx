@@ -6,7 +6,7 @@ type Props = { v: any };
 export default function RecordsFiles({ v }: Props) {
   return (
     <>
-      <div style={{"display":"flex","gap":"14px","alignItems":"stretch","height":"min(74vh,700px)","minHeight":"460px"}}>
+      <div className="j-rec-files" style={{"display":"flex","gap":"14px","alignItems":"stretch","height":"min(74vh,700px)","minHeight":"460px"}}>
         {v.tree?.open && (
           <>
             <div style={{"flex":"none","width":"266px","display":"flex","flexDirection":"column","background":"var(--surface)","border":"1px solid var(--border)","borderRadius":"var(--card-r,18px)","backdropFilter":"blur(20px) saturate(1.3)","boxShadow":"var(--card-shadow)","overflow":"hidden","animation":"slideRight .3s var(--ease) both"}}>

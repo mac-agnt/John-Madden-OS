@@ -65,6 +65,13 @@ import {
   hexRGB,
   buildGraph
 } from "./data";
+import { getState as jmaState, subscribe as jmaSubscribe } from "../jma/store";
+import { MODULES, MODULE_ICONS, tabsFor, tabOf, setTab, registerNavigator, reportPage, subscribeUi, getUi, go as jmaGo } from "../jma/ui";
+import * as JS from "../jma/selectors";
+import { jmaAnswer } from "../jma/answers";
+import { jmaSearch } from "../jma/search";
+import { jmaFileTree, jmaContacts, jmaGraphStats, createRecordFromTemplate } from "../jma/records";
+import { localParts, fmtDateTime } from "../jma/time";
 
 /* ── Locked layout ──────────────────────────────────────────────────────────
    These two rules hold for every client build, whatever data.js says:
@@ -83,10 +90,25 @@ const NAV = (() => {
   while (items.length && items[0].divider) items.shift();
   return [home, agents].concat(items);
 })();
+/* John Madden OS: the same guard, applied to the persona-filtered module list.
+   Home then Agents always lead whenever the previewed persona may see them;
+   the remaining modules follow in labelled groups. */
+const navFor = (personaKind) => {
+  const allowed = new Set(MODULES.filter(m => m.id !== "Settings" && m.personas.includes(personaKind)).map(m => m.id));
+  const lead = NAV.filter(n => !n.divider && !n.group && (n.page === "Home" || n.page === "Agents") && allowed.has(n.page));
+  const out = lead.slice();
+  let group = "";
+  NAV.filter(n => !n.divider && n.page !== "Home" && n.page !== "Agents" && allowed.has(n.page)).forEach(n => {
+    const g = (MODULES.find(m => m.id === n.page) || {}).group || "";
+    if (g && g !== group) { out.push({group:g}); group = g; }
+    out.push(n);
+  });
+  return out;
+};
 
 /* All state and behaviour for Pulse. renderVals() returns the flat object the views render from. */
 export default class PulseLogic extends DCLogic {
-  state = { w: typeof window === "undefined" ? 1440 : window.innerWidth, theme:"harbour", page:"Home", draft:"", query:"", thread:[], typed:0, paletteOpen:false, showNotifs:false, palScope:"All", palSel:0, palRecent:["Dunne & Sons Ltd","Credit Control"],
+  state = { w: typeof window === "undefined" ? 1440 : window.innerWidth, theme:"jma", page:"Home", draft:"", query:"", thread:[], typed:0, paletteOpen:false, showNotifs:false, palScope:"All", palSel:0, palRecent:[],
             done:{}, resolved:{}, approved:{}, inboxFilter:"All", approvalFilter:"Awaiting you", open:null, range:"30d",
             workDoc:null, workDocTab:"work",
             queue:"mine", recordTab:"Overview", record:"person", hovered:null, hoverLabel:"", hoverHint:"", hoverTop:0,
@@ -101,8 +123,8 @@ export default class PulseLogic extends DCLogic {
             newRecOpen:false, newRecName:"", newRecTemplate:"Field sheet", newRecCat:"All",
             opsFilter:"all", opsOff:{}, opsOpen:null, opsScope:"week", opsDay:26, opsOrder:null, opsDrag:null,
             opsBuilderOpen:false, opsBuilderMode:"workflow", builderText:"", builderGenerated:false,
-            railOpen:true, barOpen:true, chatRailPinned:false, widgetEdit:false, widgets:["inbox","work","activity"],
-            kpiEdit:false, kpiKeys:["revenue","cash","overdue","margin","jobs"],
+            railOpen: typeof window === "undefined" ? true : window.innerWidth >= 1100, barOpen:true, chatRailPinned:false, widgetEdit:false, widgets:["inbox","work","visits","activity"],
+            kpiEdit:false, kpiKeys:["live","attention","review","overdue"],
             aspect:"sales", filterMenuOpen:false, customFilter:"", extraFilters:[],
             workWidget:"queue", miniOpen:false, miniThread:[], miniDraft:"", miniTab:"chat", miniTone:"plain", miniWorkOpen:"tasks",
             agents:AGENT_DEFS, agentId:"briefing", groupNames:{}, agentQuery:"", agentDraft:"", agentExtra:{},
@@ -972,11 +994,11 @@ export default class PulseLogic extends DCLogic {
   // character down and swings the new one up. Results are cached per stamp so
   // repeat renders inside one tick don't cancel a flip mid-air.
   buildFlipUnits(BODY, INK, LIME){
-    const now = new Date();
-    const DAY = ["SUN","MON","TUE","WED","THU","FRI","SAT"][now.getDay()];
-    const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][now.getMonth()];
-    const target = (DAY + String(now.getDate()).padStart(2,"0") + MON
-      + String(now.getHours()).padStart(2,"0") + String(now.getMinutes()).padStart(2,"0")).split("");
+    const lp = localParts(jmaState().now);
+    const DAY = ["SUN","MON","TUE","WED","THU","FRI","SAT"][lp.wd];
+    const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"][lp.m - 1];
+    const target = (DAY + String(lp.d).padStart(2,"0") + MON
+      + String(lp.h).padStart(2,"0") + String(lp.min).padStart(2,"0")).split("");
     if (!this._flapMount) this._flapMount = Date.now();
     const el = Date.now() - this._flapMount;
     const settleAt = i => 200 + i * 75 + 200;
@@ -1159,6 +1181,10 @@ export default class PulseLogic extends DCLogic {
   }
 
   componentDidMount(){
+    this._jmaUnsub = jmaSubscribe(() => { this._legendCounts = null; this.forceUpdate(); });
+    this._uiUnsub = subscribeUi(() => this.forceUpdate());
+    registerNavigator((page) => this.go(page));
+    reportPage(this.state.page);
     requestAnimationFrame(() => this.syncRailThumb());
     setTimeout(() => this.syncRailThumb(), 700);
     setTimeout(() => { const nav = document.querySelector('nav[data-rail-nav]');
@@ -1197,7 +1223,7 @@ export default class PulseLogic extends DCLogic {
       this._startLoop(stale);
     }, 250);
     this._startLoop(true);
-    this._resize = () => this.setState({w: window.innerWidth});
+    this._resize = () => this.setState(p => ({w: window.innerWidth, railOpen: window.innerWidth < 1024 ? false : p.railOpen}));
     window.addEventListener("resize", this._resize);
     this._key = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k"){
@@ -1216,10 +1242,10 @@ export default class PulseLogic extends DCLogic {
     };
     window.addEventListener("paste", this._paste);
   }
-  componentWillUnmount(){ window.removeEventListener("paste", this._paste); window.removeEventListener("resize", this._resize); window.removeEventListener("keydown", this._key); clearInterval(this._t); clearInterval(this._clockTimer); clearInterval(this._flapBoot); cancelAnimationFrame(this._raf); clearInterval(this._fallback); clearInterval(this._actTimer); clearInterval(this._kpiTimer); }
+  componentWillUnmount(){ if (this._jmaUnsub) this._jmaUnsub(); if (this._uiUnsub) this._uiUnsub(); window.removeEventListener("paste", this._paste); window.removeEventListener("resize", this._resize); window.removeEventListener("keydown", this._key); clearInterval(this._t); clearInterval(this._clockTimer); clearInterval(this._flapBoot); cancelAnimationFrame(this._raf); clearInterval(this._fallback); clearInterval(this._actTimer); clearInterval(this._kpiTimer); }
 
   ask(q){
-    const a = pickAnswer(q);
+    const a = jmaAnswer(q, jmaState());
     const words = a.text.split(" ").length;
     const thread = this.state.thread.concat([
       {role:"user", text:q},
@@ -1250,7 +1276,8 @@ export default class PulseLogic extends DCLogic {
   componentDidUpdate(){ this.syncRailThumb(); }
 
   go(page){
-    const order = NAV.filter(n => !n.divider).map(n => n.page).concat(["Settings"]);
+    reportPage(page);
+    const order = navFor(jmaState().persona.kind).filter(n => n.page).map(n => n.page).concat(["Settings"]);
     const from = order.indexOf(this.state.page), to = order.indexOf(page);
     if (from > -1 && to > -1 && from !== to) this.setState(p => ({navDir: to > from ? 1 : -1, navSeq:(p.navSeq || 0) + 1}));
     this.setState({page, open:null, showNotifs:false, filterMenuOpen:false});
@@ -1272,7 +1299,7 @@ export default class PulseLogic extends DCLogic {
     });
   }
   askMini(q){
-    const a = pickAnswer(q);
+    const a = jmaAnswer(q, jmaState());
     this.setState(prev => ({
       miniThread: prev.miniThread.concat([{role:"user", text:q}, {role:"helios", text:a.text}]),
       miniDraft: ""
@@ -1409,10 +1436,12 @@ export default class PulseLogic extends DCLogic {
         + "transform:translateX(" + (hov && !act ? "3px" : "0") + ");"
         + "transition:transform .5s cubic-bezier(.22,1.2,.36,1),font-weight .2s var(--ease)"
       : "display:none";
-    const nav = NAV.map((n, idx) => n.divider
+    const nav = navFor(jmaState().persona.kind).map((n, idx) => n.group
+      ? {isGroup: railOpen, isDivider: !railOpen, isItem:false, label:n.group}
+      : n.divider
       ? {isDivider:true, isItem:false}
-      : {isItem:true, isDivider:false, label:n.label, hint: railOpen ? (n.hint || "") : "", d:ICONS[n.icon],
-         dot: n.dot === true && openKeys.length > 0,
+      : {isItem:true, isDivider:false, label:n.label, hint: railOpen ? (n.hint || "") : "", d:ICONS[n.icon] || MODULE_ICONS[n.icon],
+         dot: n.page === "Dashboard" ? JS.attention(jmaState()).length > 0 : n.page === "Activity" ? JS.visibleEvents(jmaState()).some(e => e.status === "failed") : false,
          dotStyle: "position:absolute;top:5px;" + (railOpen ? "left:30px" : "right:6px")
            + ";width:5px;height:5px;border-radius:50%;background:var(--accent)",
          inlineStyle: inlineStyle(st.railHov === idx, n.page === page),
@@ -1704,6 +1733,8 @@ export default class PulseLogic extends DCLogic {
       watch:[AMBER,""], "on stop":[RED,""]};
     const askTerms = askQ ? askQ.split(/\s+/).filter(w => w.length > 2 &&
       ["the","and","for","who","any","anyone","all","are","with","from","that","show","find","list","get","people","contact","contacts"].indexOf(w) < 0) : [];
+    const CONTACTS = jmaContacts(jmaState());
+    const FILE_TREE = jmaFileTree(jmaState());
     const matchedContacts = CONTACTS.filter(c => {
       if (!askTerms.length) return true;
       const hay = c.slice(0, 5).join(" ").toLowerCase();
@@ -1740,14 +1771,16 @@ export default class PulseLogic extends DCLogic {
     const ontoSel = ONTO_NODES.find(n => n[0] === st.ontoNode) || ONTO_NODES[0];
 
     const HERO = {
-      contacts:{eyebrow:"CONTACTS · " + CONTACTS.length + " ON FILE", title:"Everyone you deal with",
-        blurb:"Staff and external in one place. Ask in your own words — it matches on name, role, organisation and tag.",
-        placeholder:"Try “buyers in Cork”, “installers”, “on stop”…", kind:"KEYWORD", scroll:"SCROLL FOR THE FULL LIST",
-        suggestions:["on stop","installer","Casey","supplier"]},
-      files:{eyebrow:"FILES · " + FILE_TREE.filter(r => r.type === "file").length + " DOCUMENTS",
-        title:"Everything on record", blurb:"Contracts, certificates and invoices. Indexed pages are the ones Helios can read from.",
-        placeholder:"Search inside every document…", kind:"FULL TEXT", scroll:"SCROLL FOR THE VIEWER",
-        suggestions:["credit","expiry","framework","invoice"]},
+      contacts:{eyebrow:"CLIENTS AND CONTACTS · " + CONTACTS.length + " ON FILE", title:"Households, contacts and prospects",
+        blurb:"The canonical index. Each row opens the same client record used in Clients.",
+        placeholder:"Try a household, a locality or “lead”", kind:"KEYWORD", scroll:"",
+        suggestions:["lead","review","Walsh","Mullingar"]},
+      staff:{eyebrow:"STAFF · 8 DEMO PEOPLE", title:"Staff", blurb:"Five in Mullingar, three in the Philippines. Fictional except Ciaran Madden.",
+        placeholder:"", kind:"", scroll:"", suggestions:[]},
+      files:{eyebrow:"DOCUMENTS · " + FILE_TREE.filter(r => r.type === "file").length + " ON RECORD",
+        title:"Documents and drawing versions", blurb:"Grouped by project. Storage paths are proposed SharePoint references; the demo does not connect to SharePoint.",
+        placeholder:"Search document names and notes", kind:"FULL TEXT", scroll:"",
+        suggestions:["site map","Rev B","council","quote"]},
       ontology:{eyebrow:"ONTOLOGY", title:"Ontology", blurb:recSec.blurb,
         placeholder:"", kind:"", scroll:"", suggestions:[]}
     }[recSec.id];
@@ -1756,7 +1789,8 @@ export default class PulseLogic extends DCLogic {
       title: HERO.title, blurb: HERO.blurb,
       eyebrow: HERO.eyebrow, askPlaceholder: HERO.placeholder,
       searchKind: HERO.kind, scrollHint: HERO.scroll,
-      hasHero: page === "Records" && recSec.id !== "ontology",
+      hasHero: page === "Records" && recSec.id !== "ontology" && recSec.id !== "staff",
+      isStaff: page === "Records" && recSec.id === "staff",
       isContacts: page === "Records" && recSec.id === "contacts",
       isFiles: page === "Records" && recSec.id === "files",
       isOntology: page === "Records" && recSec.id === "ontology",
@@ -1776,10 +1810,10 @@ export default class PulseLogic extends DCLogic {
       askTerms,
       askSuggestions: HERO.suggestions.map(s => ({label:s,
         use: () => this.setState(recSec.id === "files" ? {treeQuery:s} : {recAsk:s})})),
-      contactCols: ["Name","Role","Email","Organisation","Tag"],
+      contactCols: ["Name","Role","Email","Household / record","Stage"],
       tableCaption: askTerms.length
         ? "Filtered by " + askTerms.map(t => "“" + t + "”").join(" or ")
-        : "Staff, customers and suppliers as one set of records.",
+        : "Client households, their contacts and open prospects.",
       tableBadge: matchedContacts.length + " / " + CONTACTS.length,
       tableFooter: "Showing " + matchedContacts.length + " of " + CONTACTS.length + " contacts",
       contactsEmpty: matchedContacts.length === 0,
@@ -1788,7 +1822,7 @@ export default class PulseLogic extends DCLogic {
         return {name:c[0], role:c[1], email:c[2], org:c[3], tag:c[4], bg:c[5],
           initials: c[0].split(" ").map(w => w[0]).slice(0,2).join(""),
           tagStyle: "padding:3px 11px;border-radius:var(--r-sm,9px);font-size:11px;background:var(--chip);border:1px solid var(--chip-border);color:" + tint[0],
-          open: () => this.setState({recSection:"files"})};
+          open: c[6]};
       })
     };
 
@@ -1804,8 +1838,7 @@ export default class PulseLogic extends DCLogic {
       fileTitle: activeFile ? activeFile.title : "",
       facts: activeFile ? activeFile.facts.map(k => ({k:k[0], v:k[1]})) : [],
       body: activeFile ? activeFile.body : [],
-      links: activeFile ? activeFile.links.map(l => ({label:l[0],
-        open: () => this.setState({recSection: l[1] === "person" || l[1] === "org" ? "contacts" : "ontology"})})) : []
+      links: activeFile ? (activeFile.links || []).map(l => ({label:l[0], open: l[2]})) : []
     };
 
     /* ---- admin ---- */
@@ -2343,8 +2376,8 @@ export default class PulseLogic extends DCLogic {
     const g = this.graph, live = this.searches || [];
     const PHASE_WORD = {sweep:"expanding", path:"tracing", hold:"matched", fade:"clearing"};
     const graphModel = {
-      nodeCount: g ? g.nodes.length.toLocaleString("en-IE") : "—",
-      edgeCount: g ? g.edges.length.toLocaleString("en-IE") : "—",
+      nodeCount: jmaGraphStats(jmaState()).records.toLocaleString("en-IE"),
+      edgeCount: jmaGraphStats(jmaState()).relationships.toLocaleString("en-IE"),
       running: live.filter(s => s.delay <= 0).length + " OF " + live.length,
       queries: live.map((s, i) => {
         const settled = Math.min(s.order.length, Math.floor(s.reveal));
@@ -2360,10 +2393,7 @@ export default class PulseLogic extends DCLogic {
       }),
       run: () => { if ((st.ontoQuery || "").trim()) this.runOntoQuery(); else this.planSearch(); try { this.setState({gTick: Math.random()}); } catch (e) {} },
       legend: CLUSTERS.map((c, i) => ({label:c[0], bg:c[1],
-        count: g ? String((this._legendCounts || (this._legendCounts = (() => {
-          const c = new Array(CLUSTERS.length).fill(0);
-          for (const nd of g.nodes) if (nd.kind !== "core" && nd.cluster >= 0) c[nd.cluster]++;
-          return c; })()))[i]) : "—"}))
+        count: String(jmaGraphStats(jmaState()).counts[i] ?? "—")}))
     };
 
     const oq = st.ontoQuery || "", ontoSearchRes = st.ontoResult;
@@ -2434,7 +2464,7 @@ export default class PulseLogic extends DCLogic {
       footer: st.newRecName.trim() ? "Saves into " + recSec.label.toLowerCase() : "Every record gets an id, an owner and an audit trail",
       setName: (e) => this.setState({newRecName:e.target.value}),
       close: () => this.setState({newRecOpen:false}),
-      save: () => this.setState({newRecOpen:false}),
+      save: () => { const r = createRecordFromTemplate(st.newRecName || "", st.newRecTemplate || "Field sheet"); if (r.ok) this.setState({newRecOpen:false, recSection:"files", treeFile:r.id}); },
       cats: REC_TEMPLATE_CATS.map(c => {
         const on = (st.newRecCat || "All") === c;
         return {label:c,
@@ -2853,14 +2883,9 @@ export default class PulseLogic extends DCLogic {
        contributions:[{n:"6",k:"entities"},{n:"9",k:"helios tools"},{n:"12",k:"events"}]}
     ];
 
-    const notificationFeed = [
-      {dot:LIME, text:"Aoife Nolan assigned you “Approve purchase order PO-4471”", event:"core.approval.created", channel:"Inbox", meta:"18m"},
-      {dot:RED, text:"Xero invoice sync failed — refresh token expired", event:"core.automation.failed", channel:"Inbox · WhatsApp", meta:"6h"},
-      {dot:AMBER, text:"Helios flagged a change in Dunne & Sons payment behaviour", event:"core.notification.created", channel:"Inbox", meta:"2h"},
-      {dot:AMBER, text:"Thursday's depot visit is still unassigned", event:"site-visits.visit.created", channel:"Inbox", meta:"2h"},
-      {dot:NEUTRAL, text:"Séamus Byrne mentioned you on “Reassign Van 04 jobs”", event:"core.comment.created", channel:"Inbox", meta:"Yesterday"},
-      {dot:NEUTRAL, text:"Your daily briefing is ready", event:"core.briefing.sent", channel:"WhatsApp", meta:"07:00"}
-    ];
+    const notificationFeed = JS.visibleEvents(jmaState()).filter(e => e.status === "attention" || e.status === "failed" || e.status === "retry" || e.actor.kind === "client")
+      .slice(-8).reverse().map(e => ({dot: e.status === "failed" ? RED : e.status === "attention" ? AMBER : e.actor.kind === "client" ? "var(--accent)" : NEUTRAL,
+        text: e.actor.name + ": " + e.summary, event: e.type + " · " + e.subject.label, channel: "In app", meta: fmtDateTime(e.at)}));
 
     const FEATURES = [["approvals","Approvals"],["automations","Automations"],["insights","Insights"],["customEntities","Custom entities"],["whatsapp","WhatsApp channel"],["composio","Composio actions"]];
     const features = FEATURES.map(f => {
@@ -2884,33 +2909,15 @@ export default class PulseLogic extends DCLogic {
       recent: "M12 7v5l3.4 2 M21 12a9 9 0 1 1-9-9 9 9 0 0 1 9 9"
     };
     const recents = st.palRecent || [];
-    const themeAction = st.theme === "dark" ? "Switch to light appearance" : "Switch to dark appearance";
+    const themeAction = st.theme === "light" ? "Switch to dark appearance" : "Switch to light appearance";
     const SEARCH = [
       recents.length ? {group:"Recent", scope:"All", items:recents.slice(0, 3).map(r => ({title:r, meta:"Recent search", hint:"AGAIN", glyph:"recent",
-        go: () => this.setState({query:r, palSel:0})}))} : null,
-      {group:"Actions", scope:"Actions", items:[
-        {title:"Start a new Helios conversation", meta:"Clears the current thread", hint:"ACTION", glyph:"action",
-          go: () => { clearInterval(this._t); this.setState({page:"Home", thread:[], typed:0, draft:""}); }},
-        {title:"Review approvals waiting on you", meta:"Work · approvals", hint:"ACTION", glyph:"action",
-          go: () => this.setState({page:"Work", queue:"mine"})},
-        {title:themeAction, meta:"Appearance", hint:"ACTION", glyph:"action",
-          go: () => this.setState(p => p.theme === "light" ? {theme: p.darkTheme || this.props.theme || "harbour"} : {theme:"light", darkTheme:p.theme})},
-        {title:"Open system health", meta:"Admin · modules and jobs", hint:"ACTION", glyph:"action",
-          go: () => this.setState({page:"Settings"})}
-      ]},
-      {group:"Agents", scope:"Agents", items:st.agents.slice(0, 4).map(a => ({title:a.name, meta:a.role, hint:a.group ? "GROUP" : "AGENT", glyph:"agent",
-        go: () => this.setState({page:"Agents", agentId:a.id})}))},
-      {group:"Work", scope:"Work", items:TASKS.slice(0, 4).map(t => ({title:t.title, meta:t.subject + " · due " + t.due, hint:"TASK", glyph:"task",
-        go: () => this.setState({page:"Work", queue:"mine"})}))},
-      {group:"Records", scope:"Records", items:PEOPLE.slice(0, 3).map(p => ({title:p[0], meta:p[1] + " · " + p[3], hint:"PERSON", glyph:"person",
-        go: () => this.setState({page:"Records", record:"person"})}))
-        .concat(ORGS.slice(0, 3).map(o => ({title:o[0], meta:o[1] + " · " + o[2] + " outstanding", hint:"ORG", glyph:"org",
-        go: () => this.setState({page:"Records", record:"org"})})))},
-      {group:"Pages", scope:"Pages", items:ASPECT_DEFS.slice(0, 3).map(a => ({title:a.label, meta:a.description, hint:"AREA", glyph:"page",
-        go: () => this.goPage("Dashboard", {aspect:a.id})}))
-        .concat([{title:"Roles and grants", meta:"Who can see and do what", hint:"CONFIG", glyph:"page",
-        go: () => this.setState({page:"Settings"})}])}
-    ].filter(Boolean);
+        go: () => this.setState({query:r, palSel:0})}))} : null
+    ].filter(Boolean).concat(jmaSearch(jmaState(), {
+      themeTitle: themeAction,
+      toggleTheme: () => this.setState(p => p.theme === "light" ? {theme: p.darkTheme || "jma"} : {theme:"light", darkTheme:p.theme}),
+      newChat: () => { clearInterval(this._t); this.setState({page:"Home", thread:[], typed:0, draft:""}); jmaGo("Home"); }
+    }));
 
     const match = g => g.items.filter(i => !ql || (i.title + " " + i.meta).toLowerCase().includes(ql));
     const scopeCounts = {All:0};
@@ -2926,7 +2933,8 @@ export default class PulseLogic extends DCLogic {
 
     const groups = SEARCH.filter(g => scope === "All" || g.scope === scope || g.group === "Recent")
       .map(g => ({group:g.group, items:match(g).slice(0, 6)})).filter(g => g.items.length);
-    const base = q ? 1 : 0;
+    const canAsk = jmaState().persona.kind === "admin" || jmaState().persona.kind === "mullingar";
+    const base = q && canAsk ? 1 : 0;
     const total = base + groups.reduce((n, g) => n + g.items.length, 0);
     const sel = total ? Math.max(0, Math.min(st.palSel || 0, total - 1)) : 0;
     const fresh = Date.now() - (this._palOpenedAt || 0) < 420;
@@ -2970,73 +2978,20 @@ export default class PulseLogic extends DCLogic {
       this.setState(Object.assign({page:p, paletteOpen:false, query:"", palSel:0}, extra || {}));
       if (p === "Dashboard") this.startKpiCount();
     };
-    const KITS = {
-      Home: [
-        {title:"Ask what changed today", meta:"Helios · briefing", icon:ICONS.helios, go: () => { clearInterval(this._t); this.setState({paletteOpen:false, query:"", page:"Home"}); this.ask("What changed today?"); }},
-        {title:"Action inbox", meta:openKeys.length + " waiting on you", icon:ICONS.inbox, go: jump("Home", {open:null})},
-        {title:"Edit widgets", meta:"Rearrange the right rail", icon:ICONS.dash, go: jump("Home", {widgetEdit:true})},
-        {title:"My work", meta:"Tasks due today", icon:ICONS.work, go: jump("Work", {queue:"mine"})}
-      ],
-      Work: [
-        {title:"Approvals awaiting you", meta:"Work · approvals", icon:ICONS.approvals, go: jump("Work", {workSection:"approvals"})},
-        {title:"Overdue queue", meta:"Past the due time", icon:ICONS.work, go: jump("Work", {queue:"overdue"})},
-        {title:"Unassigned", meta:"Nobody owns these yet", icon:ICONS.teams, go: jump("Work", {queue:"unassigned"})},
-        {title:"Schedules", meta:"Recurring routines", icon:ICONS.visits, go: jump("Work", {workSection:"schedules"})}
-      ],
-      Records: [
-        {title:"File tree", meta:"Browse indexed documents", icon:ICONS.files, go: jump("Records", {recSection:"files"})},
-        {title:"Contacts", meta:"People and organisations", icon:ICONS.people, go: jump("Records", {recSection:"contacts"})},
-        {title:"Ontology graph", meta:"How records relate", icon:ICONS.navRecords, go: jump("Records", {recSection:"ontology"})},
-        {title:"New record", meta:"From a template", icon:ICONS.modules, go: () => this.setState({paletteOpen:false, query:"", page:"Records", newRecOpen:true, newRecName:"", newRecTemplate:"Field sheet"})}
-      ],
-      Dashboard: [
-        {title:"Sales", meta:"Pipeline and quotes", icon:ICONS.insights, go: jump("Dashboard", {aspect:"sales"})},
-        {title:"Cash", meta:"Owed, overdue, collected", icon:ICONS.navDash, go: jump("Dashboard", {aspect:"cash"})},
-        {title:"Last 7 days", meta:"Shorten the range", icon:ICONS.autos, go: jump("Dashboard", {range:"7d"})},
-        {title:"Edit metrics", meta:"Pick the five on top", icon:ICONS.dash, go: jump("Dashboard", {kpiEdit:true})}
-      ],
-      Agents: [
-        {title:"Month-end close", meta:"Group of three agents", icon:ICONS.agents, go: jump("Agents", {agentId:"monthend"})},
-        {title:"Credit Control", meta:"Watches payment behaviour", icon:ICONS.agents, go: jump("Agents", {agentId:"credit"})},
-        {title:"Build an agent", meta:"Start from a blank brief", icon:ICONS.modules, go: () => this.setState({paletteOpen:false, query:"", page:"Agents", builderOpen:true, builderMode:"new"})},
-        {title:"Tools and grants", meta:"What agents may do", icon:ICONS.navAdmin, go: jump("Settings")}
-      ],
-      Activity: [
-        {title:"Needs attention", meta:"Failures and retries", icon:ICONS.health, go: jump("Activity", {actKpi:"attention"})},
-        {title:"Agent events", meta:"Only what Helios did", icon:ICONS.agents, go: jump("Activity", {actKpi:"ai"})},
-        {title:"People events", meta:"Only what the team did", icon:ICONS.people, go: jump("Activity", {actKpi:"people"})},
-        {title:"Everything", meta:"Full audit trail", icon:ICONS.navActivity, go: jump("Activity", {actKpi:"all"})}
-      ],
-      Settings: [
-        {title:"Roles and grants", meta:"Who can see and do what", icon:ICONS.navAdmin, go: jump("Settings")},
-        {title:"Installed modules", meta:"What this client runs", icon:ICONS.modules, go: jump("Settings")},
-        {title:"System health", meta:"Jobs, queues, sync", icon:ICONS.health, go: jump("Settings")},
-        {title:"Automations", meta:"Triggers and runs", icon:ICONS.autos, go: jump("Settings")}
-      ]
-    };
+    const KITS = {};
     const palPageRaw = KITS[page] || [
-      {title:"Ask Helios about this page", meta:"It sees what you see", icon:ICONS.helios, go: () => { this.setState({paletteOpen:false, query:"", page:"Home"}); this.ask("What should I know about " + page + "?"); }},
-      {title:"Action inbox", meta:openKeys.length + " waiting on you", icon:ICONS.inbox, go: jump("Home")},
-      {title:"My work", meta:"Tasks due today", icon:ICONS.work, go: jump("Work", {queue:"mine"})},
-      {title:"Records", meta:"Every record you can see", icon:ICONS.navRecords, go: jump("Records")}
+      {title:"What needs my attention?", meta:"Simulated answer from the records", icon:ICONS.helios, go: () => { this.setState({paletteOpen:false, query:""}); jmaGo("Home"); this.ask("What needs my attention?"); }},
+      {title:"Philippines queue", meta:JS.counts(jmaState()).phActive + " active · " + JS.counts(jmaState()).phOverdue + " overdue", icon:ICONS.files, go: () => jmaGo("Drawings", "queue")},
+      {title:"Waiting on clients", meta:JS.counts(jmaState()).waiting + " outstanding", icon:ICONS.people, go: () => jmaGo("Clients", "waiting")},
+      {title:"Overdue tasks", meta:JS.counts(jmaState()).overdue + " overdue", icon:ICONS.work, go: () => jmaGo("Work", "tasks")}
     ];
     const FREQ = [
-      {title:"Action inbox", count:"31×", icon:ICONS.inbox, go: jump("Home")},
-      {title:"Approvals", count:"24×", icon:ICONS.approvals, go: jump("Work", {workSection:"approvals"})},
-      {title:"Overdue invoices", count:"18×", icon:ICONS.insights, go: jump("Dashboard", {aspect:"cash"})},
-      {title:"Dunne & Sons Ltd", count:"12×", icon:ICONS.orgs, go: jump("Records", {recSection:"contacts", record:"org"})},
-      {title:"Month-end close", count:"9×", icon:ICONS.agents, go: jump("Agents", {agentId:"monthend"})},
-      {title:"Site visits", count:"7×", icon:ICONS.visits, go: jump("Work", {workSection:"schedules"})}
+      {title:"Executive dashboard", count:"", icon:ICONS.navDash, go: () => jmaGo("Dashboard", "executive")},
+      {title:"Office review", count:String(JS.counts(jmaState()).officeReview), icon:ICONS.approvals, go: () => jmaGo("Drawings", "review")},
+      {title:"Amendments", count:String(JS.counts(jmaState()).openAmendments), icon:ICONS.files, go: () => jmaGo("Drawings", "amendments")},
+      {title:"Enquiries", count:String(JS.counts(jmaState()).openLeads), icon:ICONS.insights, go: () => jmaGo("Sales", "enquiries")}
     ];
-    const JUMPS = [
-      {title:"Home", icon:ICONS.navHome, go: jump("Home")},
-      {title:"Work", icon:ICONS.navWork, go: jump("Work")},
-      {title:"Records", icon:ICONS.navRecords, go: jump("Records")},
-      {title:"Dashboard", icon:ICONS.navDash, go: jump("Dashboard")},
-      {title:"Agents", icon:ICONS.navAgents, go: jump("Agents")},
-      {title:"Activity", icon:ICONS.navActivity, go: jump("Activity")},
-      {title:"Settings", icon:ICONS.navAdmin, go: jump("Settings")}
-    ];
+    const JUMPS = MODULES.filter(m => m.personas.includes(jmaState().persona.kind)).map(m => ({title:m.label, icon:ICONS[m.icon] || MODULE_ICONS[m.icon], go: () => jmaGo(m.id)}));
     const RECENT_WHEN = ["2 min", "18 min", "1 h", "yesterday"];
     const recentRaw = (st.palRecent || []).slice(0, 4);
 
@@ -3089,7 +3044,14 @@ export default class PulseLogic extends DCLogic {
     const DIRS_ORDER = ["People","Organisations","Teams","Locations","Site visits"];
     const ADMIN_ORDER = ["Automations","System health","Installed modules"];
     let contextNav, contextHint, searchHint;
-    if (page === "Settings"){
+    const jmaMod = MODULES.find(m => m.id === page && m.tabs.length);
+    if (jmaMod){
+      const tabs = tabsFor(jmaMod, jmaState().persona.kind);
+      const cur = tabs.some(t => t.id === tabOf(page)) ? tabOf(page) : (tabs[0] || {}).id;
+      contextNav = tabs.map(t => seg(t.label, cur === t.id, () => setTab(page, t.id)));
+      contextHint = page.toUpperCase() + " · DEMO DATA";
+      searchHint = "Search " + page.toLowerCase() + " records";
+    } else if (page === "Settings"){
       contextNav = ADMIN_GROUPS.map(grp => seg(
         grp[0].charAt(0) + grp[0].slice(1).toLowerCase(),
         st.adminGroup === grp[0],
@@ -3117,7 +3079,7 @@ export default class PulseLogic extends DCLogic {
         seg("Home", page === "Home", () => this.go("Home")),
         seg("Dashboard", page === "Dashboard", () => this.go("Dashboard"))
       ];
-      contextHint = page === "Home" ? "HELIOS · " + openKeys.length + " WAITING" : "CRM · " + areaLabel.toUpperCase();
+      contextHint = "HOME · " + JS.attention(jmaState()).length + " NEED ATTENTION";
       searchHint = page === "Dashboard" ? "Search the dashboard" : "Search every record you can see";
     } else if (page === "Agents"){
       contextNav = [];
@@ -3168,7 +3130,7 @@ export default class PulseLogic extends DCLogic {
     return {
       nav, contextNav, contextHint, searchHint, queueTasks,
       isRecords: page === "Records",
-      isActivity: page === "Activity",
+      isActivity: false,
       act: actModel,
       admin: adminModel,
       showRecordsWash: page === "Records" && recSec.id !== "ontology",
@@ -3195,8 +3157,8 @@ export default class PulseLogic extends DCLogic {
       settingsInlineStyle: inlineStyle(st.railHov === "settings", page === "Settings"),
 
       /* header zones */
-      isAgents: page === "Agents",
-      showPillNav: page !== "Agents",
+      isAgents: false,
+      showPillNav: true,
 
       /* home widgets */
       widgetHint: st.widgetEdit ? "EDITING BOARD" : String(st.widgets.length) + " WIDGETS",
@@ -3219,10 +3181,7 @@ export default class PulseLogic extends DCLogic {
       removeActivity: () => this.toggleIn("widgets", "activity"),
       removeKpi: () => this.toggleIn("widgets", "kpi"),
       removeVisits: () => this.toggleIn("widgets", "visits"),
-      miniKpis: ["revenue","overdue","jobs","margin"].map(k => {
-        const d = KPI_DEFS[k];
-        return {label:d.label, value:d.value, delta:d.delta, deltaColor: d.dir === "up" ? GREEN : RED};
-      }),
+      miniKpis: [],
       visitWidget: [
         {title:"Boiler service · Casey Builders", when:"Wed 09:00", dot:LIME},
         {title:"Pre-install survey · Ó Riain", when:"Wed 14:00", dot:LIME},
@@ -3230,8 +3189,8 @@ export default class PulseLogic extends DCLogic {
       ],
 
       /* dashboard */
-      isDashboard: page === "Dashboard",
-      dashTitle: "Kilbride Group · " + areaLabel,
+      isDashboard: page === "Dashboard" && tabOf("Dashboard") === "executive",
+      dashTitle: "John Madden & Associates · Executive",
       kpiEdit: st.kpiEdit,
       toggleKpiEdit: () => this.setState(prev => ({kpiEdit: !prev.kpiEdit})),
       kpiEditLabel: st.kpiEdit ? "Done" : "Edit KPIs",
@@ -3239,7 +3198,7 @@ export default class PulseLogic extends DCLogic {
       kpiEditBorder: st.kpiEdit ? "var(--on-accent)" : "var(--on-accent-soft)",
       kpiEditColor: st.kpiEdit ? "var(--accent)" : "var(--on-accent)",
       kpiColumns: String(Math.max(1, st.kpiKeys.length)),
-      kpis: st.kpiKeys.map((k, ki) => {
+      kpis: st.kpiKeys.filter(k => KPI_DEFS[k]).map((k, ki) => {
         const d = KPI_DEFS[k];
         const up = d.dir === "up";
         return {label:d.label, value:this.countValue(d.value, ki), delta:d.delta, hint:d.hint,
@@ -3674,7 +3633,7 @@ export default class PulseLogic extends DCLogic {
       sendAgent: () => { if (st.agentDraft.trim()) this.sendToAgent(st.agentDraft.trim()); },
 
       /* mini chat */
-      showFab: page !== "Home" && page !== "Agents",
+      showFab: page !== "Home" && page !== "Agents" && (jmaState().persona.kind === "admin" || jmaState().persona.kind === "mullingar"),
       fabTitle: st.miniOpen ? "Close Helios" : "Ask Helios",
       fabChatStyle: "position:absolute;inset:0;transition:transform .34s var(--ease),opacity .24s var(--ease);"
         + (st.miniOpen ? "transform:rotate(-90deg) scale(.7);opacity:0" : "transform:none;opacity:1"),
@@ -3705,41 +3664,42 @@ export default class PulseLogic extends DCLogic {
       }),
       miniHasRecent: st.thread.length > 0,
       miniRecent: st.thread.length > 0 ? [{title: (st.thread.find(m => m.role === "user") || {}).text || "Recent conversation",
-        date: new Date().toLocaleDateString("en-GB"), open: () => this.setState({page:"Home", miniOpen:false})}] : [],
+        date: fmtDateTime(jmaState().now), open: () => { this.setState({miniOpen:false}); jmaGo("Home"); }}] : [],
       miniEmpty: st.miniThread.length === 0,
-      miniGreeting: (() => { const h = new Date().getHours();
+      miniGreeting: (() => { const h = localParts(jmaState().now).h;
         const g = h < 5 ? "Still up" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Still going";
-        return g + ", Mac"; })(),
+        const sid = jmaState().persona.staffId; return g + ", " + (sid ? jmaState().staff[sid].name.split(" ")[0] : "Ciaran"); })(),
       miniSuggestions: [
-        {label:"What changed today?", run:() => this.askMini("What changed today?")},
-        {label:"What needs my decision?", run:() => this.askMini("What needs my decision?")},
-        {label:"Draft a chase for the worst account", run:() => this.askMini("Draft chase emails")}
+        {label:"What needs my attention?", run:() => this.askMini("What needs my attention?")},
+        {label:"Which drawings are late?", run:() => this.askMini("Which drawings are late?")},
+        {label:"Show jobs waiting on clients", run:() => this.askMini("Show jobs waiting on clients")}
       ],
       miniWorkSections: (() => {
-        const openTasks = WORK_TASKS.filter(t => t.status !== "Done").slice(0, 4);
+        const jd = jmaState();
+        const openTasks = JS.openTasks(jd).filter(t => !jd.persona.staffId || jd.persona.kind === "admin" || t.assigneeId === jd.persona.staffId).sort((a, b) => a.due - b.due).slice(0, 4).map(t => ({title: t.title, priority: JS.isOverdue(jd, t) ? "Overdue" : t.priority}));
+        const visits = Object.values(jd.visits).filter(x => x.state === "Scheduled" && x.at >= jd.now).sort((a, b) => a.at - b.at).slice(0, 3);
+        const alerts = JS.attention(jd).slice(0, 3);
         const meetingsOpen = (st.miniWorkOpen || "tasks") === "meetings";
         const tasksOpen = (st.miniWorkOpen || "tasks") === "tasks";
         const notifsOpen = st.miniWorkOpen === "notifications";
         const toggle = (key) => () => this.setState(prev => ({miniWorkOpen: prev.miniWorkOpen === key ? null : key}));
         return [
           {num:"01", title:"Meetings", icon:"M8 4v3 M16 4v3 M4.5 9.5h15 M6.4 6h11.2A1.9 1.9 0 0 1 19.5 8v10a1.9 1.9 0 0 1-1.9 1.9H6.4A1.9 1.9 0 0 1 4.5 18V8A1.9 1.9 0 0 1 6.4 6Z",
-            statusText:"Clear", statusColor:"var(--faint)", open:meetingsOpen, toggle:toggle("meetings"),
-            isEmpty:true, emptyText:"Nothing scheduled.", rows:[],
-            hasLink:true, linkLabel:"Full calendar", linkGo: () => this.setState({page:"Work", workSection:"schedules", miniOpen:false}),
+            statusText: visits.length ? visits.length + " site visit" + (visits.length === 1 ? "" : "s") : "Clear", statusColor:"var(--faint)", open:meetingsOpen, toggle:toggle("meetings"),
+            isEmpty: visits.length === 0, emptyText:"Nothing scheduled.", rows: visits.map(x => ({isCheck:false, title: fmtDateTime(x.at) + " · " + JS.household(jd, x.projectId) + " site visit", hasTag:false})),
+            hasLink:true, linkLabel:"Schedules", linkGo: () => { this.setState({miniOpen:false}); jmaGo("Work", "schedules"); },
             wrapStyle: "background:var(--surface);border:1px solid var(--border);border-radius:var(--card-r,18px);overflow:hidden"},
           {num:"02", title:"Tasks", icon:"M5 6.5h2l1.4 1.4L11 5.5 M5 12.5h2l1.4 1.4 2.6-2.4 M5 18.5h2l1.4 1.4 2.6-2.4 M15 6.5h4 M15 12.5h4 M15 18.5h4",
             statusText:openTasks.length + " open", statusColor:"var(--accent)", open:tasksOpen, toggle:toggle("tasks"),
             isEmpty:openTasks.length === 0, emptyText:"Nothing open.",
             rows: openTasks.map(t => ({isCheck:true, title:t.title,
               hasTag:true, tag:t.priority, tagStyle:"flex:none;padding:2px 9px;border-radius:var(--chip-r,6px);font-size:11px;background:var(--ok-soft);color:var(--ok)"})),
-            hasLink:true, linkLabel:"All tasks", linkGo: () => this.setState({page:"Work", workSection:"tasks", miniOpen:false}),
+            hasLink:true, linkLabel:"All tasks", linkGo: () => { this.setState({miniOpen:false}); jmaGo("Work", "tasks"); },
             wrapStyle: "background:var(--surface);border:1px solid var(--border);border-radius:var(--card-r,18px);overflow:hidden"},
           {num:"03", title:"Notifications", icon:"M12 4a5.5 5.5 0 0 0-5.5 5.5v3.2L5 16h14l-1.5-3.3V9.5A5.5 5.5 0 0 0 12 4Z M9.8 19a2.2 2.2 0 0 0 4.4 0",
-            statusText:"12 unread", statusColor:"#6ad0f0", open:notifsOpen, toggle:toggle("notifications"),
-            isEmpty:false, emptyText:"",
-            rows:[{isCheck:false, title:"Xero token expired — reconnect", hasTag:false},
-              {isCheck:false, title:"Aoife raised a €14,280 approval", hasTag:false},
-              {isCheck:false, title:"3 accounts moved off Standard rate", hasTag:false}],
+            statusText: alerts.length + " need attention", statusColor:"var(--warn)", open:notifsOpen, toggle:toggle("notifications"),
+            isEmpty: alerts.length === 0, emptyText:"Nothing needs attention.",
+            rows: alerts.map(a => ({isCheck:false, title: JS.household(jd, a.project.id) + ": " + a.reasons[0].text, hasTag:false})),
             hasLink:true, linkLabel:"All notifications", linkGo: () => this.setState({showNotifs:true, miniOpen:false}),
             wrapStyle: "background:var(--surface);border:1px solid var(--border);border-radius:var(--card-r,18px);overflow:hidden"}
         ];
@@ -4081,8 +4041,9 @@ export default class PulseLogic extends DCLogic {
         const live = st.agents.filter(a => a.state === "working" || a.state === "thinking").length;
         return (live ? live + " AGENTS RUNNING" : "NO AGENTS RUNNING") + " · SYNCED 2 MIN AGO";
       })(),
-      homeSubline: "Ask about any record, job or number you can see.",
-      approvalsPill: openKeys.length + " APPROVALS · €48,120 HELD",
+      homeSubline: JS.counts(jmaState()).live + " live projects. Ask about any job, drawing or client.",
+      approvalsPill: JS.attention(jmaState()).length + " PROJECTS NEED ATTENTION · " + JS.counts(jmaState()).overdue + " OVERDUE TASKS",
+      goApprovals: () => jmaGo("Dashboard", "executive"),
       showApprovalNote: openKeys.length > 0 && !st.approvalNoteHidden,
       dismissApprovalNote: () => this.setState({approvalNoteHidden:true}),
       /* Home canvas: a decorative layer the user can switch, scoped to the
@@ -4174,7 +4135,7 @@ export default class PulseLogic extends DCLogic {
           pick: () => this.setState({homeBg:o[0]})};
       }),
       greetingPrefix: (() => {
-        const h = new Date().getHours();
+        const h = localParts(jmaState().now).h;
         const pool = h < 5 ? ["Still up","Burning the midnight oil"]
           : h < 12 ? ["Good morning","Rise and grind","Morning"]
           : h < 17 ? ["Good afternoon","Afternoon"]
@@ -4183,16 +4144,10 @@ export default class PulseLogic extends DCLogic {
         // A goofy one about 1 in 5 times, otherwise the plain greeting — picked
         // once per hour and cached, so it doesn't flip on every re-render.
         const goofy = ["Top of the morning","Look who it is","Well if it isn't"];
-        const bucket = Math.floor(Date.now() / 3600000);
-        if (this._greetBucket !== bucket) {
-          this._greetBucket = bucket;
-          const useGoofy = bucket % 5 === 0;
-          const list = useGoofy ? pool.concat(goofy) : pool;
-          this._greetPick = list[Math.floor(Math.random() * list.length)];
-        }
-        return this._greetPick;
+        void goofy;
+        return pool[0];
       })(),
-      greetingName: "Mac",
+      greetingName: (jmaState().persona.staffId && jmaState().staff[jmaState().persona.staffId] ? jmaState().staff[jmaState().persona.staffId].name.split(" ")[0] : "Ciaran"),
       flipUnits: this.buildFlipUnits(BODY, INK, LIME),
       enterSettings: (e) => this.hover("__settings", "Settings", "", e),
       leaveSettings: () => this.unhover("__settings"),
@@ -4203,10 +4158,13 @@ export default class PulseLogic extends DCLogic {
         style: labelStyle(st.hovered !== null, st.hoverTop)
       },
       isChat: page === "Home",
-      isWork: page === "Work",
-      isSettings: page === "Settings",
+      isWork: false,
+      isSettings: false,
+      page,
+      jmaPersona: jmaState().persona.kind,
+      ontoTrace: (q) => { this.setState({ontoQuery:q}); setTimeout(() => this.runOntoQuery(), 0); },
       admin: adminModel,
-      inboxCount: String(openKeys.length),
+      inboxCount: String(notificationFeed.length),
       inboxEmpty: openKeys.length === 0,
       filteredEmpty: inboxKeys.length === 0,
       queueEmpty: queueTasks.length === 0,
@@ -4232,7 +4190,7 @@ export default class PulseLogic extends DCLogic {
           confirmSummary: m.confirmSummary || "",
           confirmHash: "sha256 a4f19c…",
           hasActions: done && m.confirm !== true && !!m.actions,
-          actions:(m.actions || []).map(a => ({label:a[0], bg:a[1] ? LIME : "none", color:a[1] ? "var(--on-accent)" : "var(--ink)", border:a[1] ? LIME : "var(--border)", run:() => this.ask(a[0])}))
+          actions:(m.actions || []).map(a => ({label:a[0], bg:a[1] ? "var(--accent)" : "none", color:a[1] ? "var(--on-accent)" : "var(--ink)", border:a[1] ? "var(--accent)" : "var(--border)", run:() => { const r = a[2] ? a[2]() : "ask"; if (r === "ask") this.ask(a[0]); }}))
         };
       }),
       suggestions: [
@@ -4275,11 +4233,11 @@ export default class PulseLogic extends DCLogic {
         {name:"Installer", grants:"core:task:view, core:task:update, site-visits:visit:*", scope:"own", users:"9"},
         {name:"Counter staff", grants:"core:person:view, core:organisation:view", scope:"location", users:"6"}
       ],
-      team: [{i:"AN",bg:"var(--accent)"},{i:"SB",bg:"#9fd6f0"},{i:"TW",bg:"#e6c78a"}],
+      team: ["s-aoife","s-eoin","s-bea"].map(id => ({i: jmaState().staff[id].initials, bg: jmaState().staff[id].colour})),
       paletteOpen: st.paletteOpen, showNotifs: st.showNotifs, query: st.query, draft: st.draft,
       noResults: results.length === 0,
       palScopes, hasQuery: q.length > 0, askPreview: q ? '"' + q + '"' : "",
-      palIsHome: !q, palPage, palFrequent, palRecentRows, palJump,
+      palIsHome: !q, palPage, palFrequent, palRecentRows, palJump, canAsk,
       palPageLabel: page.toUpperCase(),
       palHasRecent: recentRaw.length > 0,
       palClearRecent: () => this.setState({palRecent:[], palSel:0}),
@@ -4297,10 +4255,10 @@ export default class PulseLogic extends DCLogic {
         if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)){ e.preventDefault(); this.setState({palSel: n ? (cur - 1 + n) % n : 0}); return; }
         if (e.key === "Enter"){
           e.preventDefault();
-          if ((e.metaKey || e.ctrlKey) && q) { this.ask(q); return; }
+          if ((e.metaKey || e.ctrlKey) && q && canAsk) { this.ask(q); return; }
           const target = flat[q ? sel : homeSel];
           if (target) target();
-          else if (q) this.ask(q);
+          else if (q && canAsk) this.ask(q);
         }
       },
       send: () => { if (st.draft.trim()) this.ask(st.draft.trim()); },
@@ -4339,9 +4297,10 @@ export default class PulseLogic extends DCLogic {
         + "max-width:" + (st.thread.length && !st.chatRailPinned ? "880px" : "760px") + ";"
         + "transition:max-width .38s var(--ease)",
       composerTools: [
-        {label:"Records", icon:ICONS.navRecords, go: () => this.setState({page:"Records"})},
-        {label:"Files", icon:ICONS.files, go: () => this.setState({page:"Records", recSection:"files"})},
-        {label:"Agents", icon:ICONS.navAgents, go: () => this.setState({page:"Agents"})}
+        {label:"What needs my attention?", icon:ICONS.inbox, go: () => this.ask("What needs my attention?")},
+        {label:"Which drawings are late?", icon:ICONS.files, go: () => this.ask("Which drawings are late?")},
+        {label:"Jobs waiting on clients", icon:ICONS.people, go: () => this.ask("Show jobs waiting on clients")},
+        {label:"What changed on the Dunne project?", icon:ICONS.navRecords, go: () => this.ask("What changed on the Dunne project?")}
       ],
       composerPrompts: [
         {label:"Chase the three invoices past 60 days", tag:"CASH", icon:ICONS.insights,
