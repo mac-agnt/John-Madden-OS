@@ -56,14 +56,14 @@ function Organisation({ d }: { d: DemoState }) {
           ["Philippines team", TZ_PH + " · now " + fmtTime(d.now, TZ_PH) + " on " + fmtDate(d.now, TZ_PH)],
         ]} />
       </Panel>
-      <Panel title="Brand (provisional)">
+      <Panel title="Brand">
         <div className="j-stack">
           <div className="jo-swatches">
-            {[["Slate accent", "#557AA3"], ["Ink", "#182534"], ["Pale", "#E8EFF6"]].map(([n, c]) => (
+            {[["Forest", "#13301F"], ["JMA green", "#517F43"], ["Logo mint", "#5EB780"]].map(([n, c]) => (
               <span key={c} className="jo-swatch"><i style={{ background: c }} />{n} {c}</span>
             ))}
           </div>
-          <div className="j-note warn">Text JMA mark and slate accent (#557AA3, ink #182534, pale #E8EFF6) are provisional demo choices. The official logo exists on johnmadden.ie but has not been supplied; colours are unverified.</div>
+          <div className="j-note">Logo and colours taken from johnmadden.ie. Type is Wix Madefor, as used on the site.</div>
         </div>
       </Panel>
     </>

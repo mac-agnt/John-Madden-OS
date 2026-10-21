@@ -22,7 +22,7 @@ export const ASSETS = {
 };
 
 const STAFF: Staff[] = [
-  { id: "s-ciaran", name: "Ciaran Madden", initials: "CM", role: "Administrator and management viewer", team: "Mullingar", tz: TZ_OFFICE, email: "cmadden@johnmadden.ie", emailNote: "Supplied contact. Demo role assumed.", real: true, colour: "#557AA3" },
+  { id: "s-ciaran", name: "Ciaran Madden", initials: "CM", role: "Administrator and management viewer", team: "Mullingar", tz: TZ_OFFICE, email: "cmadden@johnmadden.ie", emailNote: "Supplied contact. Demo role assumed.", real: true, colour: "#517F43" },
   { id: "s-aoife", name: "Aoife Brennan", initials: "AB", role: "Project delivery manager", team: "Mullingar", tz: TZ_OFFICE, email: "aoife.demo@johnmadden.ie", emailNote: "Illustrative alias. Fictional person. Nothing is sent.", real: false, colour: "#8fb3d9" },
   { id: "s-niamh", name: "Niamh Doyle", initials: "ND", role: "Client coordinator and sales follow-up", team: "Mullingar", tz: TZ_OFFICE, email: "niamh.demo@johnmadden.ie", emailNote: "Illustrative alias. Fictional person. Nothing is sent.", real: false, colour: "#c9a7e0" },
   { id: "s-eoin", name: "Eoin Walsh", initials: "EW", role: "Architectural technologist and amendment owner", team: "Mullingar", tz: TZ_OFFICE, email: "eoin.demo@johnmadden.ie", emailNote: "Illustrative alias. Fictional person. Nothing is sent.", real: false, colour: "#e3c27f" },

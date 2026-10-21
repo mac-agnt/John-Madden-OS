@@ -44,7 +44,7 @@ export default function Portal() {
   return (
     <main className="jd-portal" aria-label="Client portal">
       <header className="jd-portal-head">
-        <div className="j-eyebrow">John Madden &amp; Associates</div>
+        <div className="jd-portal-brand"><span className="jd-portal-logo"><img src="/brand/jma-logo.png" alt="" /></span><span>John Madden &amp; Associates</span></div>
         <h1 className="j-h1">{client.household} household</h1>
         <div className="j-text">{project ? project.id + " · " + project.locality : client.locality}{contact ? " · signed in as " + contact.name.split(" ")[0] : ""}</div>
         <span className="jd-portal-note"><Icon name="info" size={13} />Demo preview of a client portal. Fictional data; nothing is sent or stored outside this browser.</span>

@@ -64,15 +64,15 @@ export default function AppShell({ v }: Props) {
       <nav data-rail-nav="1" style={css(v.railOuter)}>
         <span style={css(v.railThumbStyle)} />
         <div style={css(cat(v.railRowStyle, "margin-bottom:22px"))}>
-          <button className={cx("ix0", "ix1")} onClick={v.toggleRail} title={v.railLabel} style={{"width":"36px","height":"36px","flex":"none","border":"0","borderRadius":"var(--cta-r,11px)","background":"var(--accent-fill,var(--accent))","color":"var(--on-accent)","boxShadow":"var(--accent-glow,none)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","fontSize":"10.5px","fontWeight":"700","letterSpacing":".02em","padding":"0","transition":"transform .2s var(--ease)"}}>
-            {"JMA"}
+          <button className={cx("ix0", "ix1")} onClick={v.toggleRail} title={v.railLabel} style={{"width":"36px","height":"36px","flex":"none","border":"0","borderRadius":"var(--cta-r,11px)","background":"#13301f","boxShadow":"inset 0 0 0 1px rgba(255,255,255,.06)","cursor":"pointer","display":"flex","alignItems":"center","justifyContent":"center","padding":"0","transition":"transform .2s var(--ease)"}}>
+            <img src="/brand/jma-logo.png" alt="John Madden & Associates" style={{"height":"24px","width":"auto","display":"block"}} />
           </button>
           <span style={css(v.brandStyle)}>
-            <span style={{"display":"block","fontSize":"15px","fontWeight":"600","letterSpacing":"-.3px","color":"var(--ink)"}}>
+            <span style={{"display":"block","fontFamily":"var(--display,inherit)","fontSize":"14px","fontWeight":"600","letterSpacing":"-.3px","color":"var(--ink)"}}>
               {"John Madden OS"}
             </span>
             <span style={{"display":"block","marginTop":"2px","fontSize":"9px","fontWeight":"500","letterSpacing":".12em","color":"var(--accent)"}}>
-              {"JOHN MADDEN & ASSOCIATES"}
+              {"JMA · MULLINGAR"}
             </span>
           </span>
           {v.railOpen && (
